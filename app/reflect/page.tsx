@@ -25,7 +25,7 @@ function insights(s: GameState, me: string) {
   for (let i = 0; i < 35; i++) { const d = addDays(t, -i); const k = parseD(d).getDay(); byDow[k] += xpBetween(logs, d, d); cnt[k]++; }
   const avg = byDow.map((v, i) => v / Math.max(1, cnt[i]));
   const best = avg.indexOf(Math.max(...avg)), worst = avg.indexOf(Math.min(...avg));
-  out.push({ icon: "📅", title: `${DOW[best]}s are your power days`, body: `You average ${Math.round(avg[best])} XP on ${DOW[best]}s vs ${Math.round(avg[worst])} on ${DOW[worst]}s. Schedule something small and easy for ${DOW[worst]}s.` });
+  if (avg[best] > 0) out.push({ icon: "📅", title: `${DOW[best]}s are your power days`, body: `You average ${Math.round(avg[best])} XP on ${DOW[best]}s vs ${Math.round(avg[worst])} on ${DOW[worst]}s. Schedule something small and easy for ${DOW[worst]}s.` });
 
   // week over week
   const ws = weekStart(t);

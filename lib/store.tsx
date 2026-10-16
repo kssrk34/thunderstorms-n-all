@@ -10,6 +10,8 @@ import type {
 import { addDays, today, uid, weekStart } from "./utils";
 
 const KEY = "thunderstorms-n-all:v1";
+// bumping this wipes any state saved under an older version
+const VERSION = 2;
 const MANUAL_DAILY_CAP = 8;
 
 /* ------------------------------------------------------------------ */
@@ -350,7 +352,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const raw = localStorage.getItem(KEY);
       if (raw) st = JSON.parse(raw);
     } catch { /* ignore */ }
-    if (!st || st.v !== 1) st = makeSeed();
+    if (!st || st.v !== VERSION) st = makeSeed();
     st = syncProgress(st, true).s;
     ref.current = st;
     setS(st);
@@ -393,7 +395,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     const mine = cel.filter((c) => c.userId === next.activeId);
     if (mine.length) setQueue((q) => [...q, ...mine]);
     for (const c of cel.filter((c) => c.userId !== next.activeId)) toast(c.emoji, `${COUSIN[c.userId].name}: ${c.title}!`, "info");
-    if (a.t === "reset") toast("⛈️", "Demo reset to fresh sample data", "info");
+    if (a.t === "reset") toast("⛈️", "Everything reset. Fresh start for all five cousins", "info");
     return true;
   }, [toast]);
 

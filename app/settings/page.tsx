@@ -125,8 +125,8 @@ export default function SettingsPage() {
 
       <Card className="flex flex-col gap-4 border-red-500/20 p-5 sm:flex-row sm:items-center">
         <div className="flex-1">
-          <div className="font-semibold">Reset demo data</div>
-          <p className="text-xs text-muted-foreground">Restores the sample data for all five cousins. Data is stored only in this browser.</p>
+          <div className="font-semibold">Reset all data</div>
+          <p className="text-xs text-muted-foreground">Clears every score, log, goal and memory for all five cousins. Data is stored only in this browser.</p>
         </div>
         {confirm ? (
           <div className="flex gap-2">

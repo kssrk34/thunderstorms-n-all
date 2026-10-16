@@ -37,12 +37,12 @@ Deploy: push to GitHub and import the repo in Vercel. No env vars are needed.
 - **Underdog Surge**: whoever is last this week (and meaningfully behind) earns 1.25× XP.
 - **Daily cap** of 8 manual logs, to discourage grinding and burnout.
 - **Rest day**: one per week protects your streak.
-- **Live sim**: other cousins act every ~25 s so the league moves during a demo. You can turn this off in Settings.
+- **Live sim**: other cousins act every ~25 s so the league moves during a demo. Off by default; turn it on in Settings.
 
 ## Code map
 
 - `lib/catalog.ts`: cousins, 12 dimensions, habits, activities, meals, lessons
 - `lib/engine.ts`: levels, streaks, scores, leaderboards, badges
 - `lib/store.tsx`: reducer, XP awarding, persistence, celebrations, live simulation
-- `lib/seed.ts`: 35 days of generated sample history
+- `lib/seed.ts`: the blank starting state (also used by Reset)
 - `components/shell.tsx`: sidebar, mobile nav, notifications, toasts, celebration overlay, log dialog
