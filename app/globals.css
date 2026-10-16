@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 228 48% 6%;
+    --foreground: 214 40% 96%;
+    --card: 228 38% 11%;
+    --card-foreground: 214 40% 96%;
+    --primary: 199 95% 60%;
+    --primary-foreground: 228 48% 6%;
+    --secondary: 262 70% 62%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 228 28% 16%;
+    --muted-foreground: 220 15% 68%;
+    --accent: 48 96% 53%;
+    --accent-foreground: 228 48% 6%;
+    --destructive: 0 80% 62%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 228 30% 22%;
+    --input: 228 30% 22%;
+    --ring: 199 95% 60%;
+    --radius: 1rem;
+  }
+  * { @apply border-border; }
+  html { color-scheme: dark; }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    background-image:
+      radial-gradient(900px 500px at 85% -10%, rgba(139, 92, 246, 0.22), transparent 60%),
+      radial-gradient(700px 450px at -5% 10%, rgba(56, 189, 248, 0.16), transparent 60%),
+      radial-gradient(600px 400px at 50% 110%, rgba(250, 204, 21, 0.07), transparent 60%);
+    background-attachment: fixed;
+    min-height: 100dvh;
+  }
+  h1, h2, h3, .font-display { font-family: var(--font-display), system-ui, sans-serif; letter-spacing: -0.01em; }
+  ::selection { background: rgba(250, 204, 21, .35); }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: hsl(var(--muted)); border-radius: 8px; }
+}
+
+@layer components {
+  .glass {
+    background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02));
+    border: 1px solid rgba(255,255,255,.09);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 10px 30px -12px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.05);
+  }
+  .glow-blue { box-shadow: 0 0 28px -4px rgba(56,189,248,.45); }
+  .glow-volt { box-shadow: 0 0 28px -4px rgba(250,204,21,.5); }
+  .text-grad {
+    background: linear-gradient(90deg, #38bdf8, #8b5cf6 55%, #facc15);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .bar-shimmer {
+    background-image: linear-gradient(90deg, #38bdf8, #8b5cf6, #facc15, #8b5cf6, #38bdf8);
+    background-size: 200% 100%;
+    animation: shimmer 3s linear infinite;
+  }
+  .chip { @apply inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs font-medium; }
+  /* let grid columns shrink below their content's intrinsic width on phones */
+  .grid > * { min-width: 0; }
+  .input-base {
+    @apply w-full min-w-0 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/70 outline-none transition focus:border-primary/70 focus:ring-2 focus:ring-primary/30;
+  }
+  .pad-safe { padding-bottom: calc(env(safe-area-inset-bottom) + 5.5rem); }
+}
+
+input[type="range"] { accent-color: #facc15; }
+select.input-base option { background: #11162b; }
