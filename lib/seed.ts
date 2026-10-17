@@ -1,17 +1,19 @@
-import { COUSINS, DEFAULT_PENALTIES, DIMS } from "./catalog";
-import type { GameState } from "./types";
+import { DEFAULT_PENALTIES } from "./catalog";
+import type { GameState, StoredGame } from "./types";
 
-/** A clean slate: no XP, logs, goals, challenges or history for any cousin. */
-export function makeSeed(): GameState {
-  const selfRatings = Object.fromEntries(COUSINS.map((c) => [c.id, Object.fromEntries(DIMS.map((d) => [d.id, 5]))])) as GameState["selfRatings"];
+export const GAME_VERSION = 3;
 
+/**
+ * The starting state for a brand-new squad: no quests, goals, logs or history
+ * for anyone. Every item in the game is created by a signed-in cousin.
+ */
+export function emptyGame(): GameState {
   return {
-    v: 2,
-    activeId: COUSINS[0].id,
+    v: GAME_VERSION,
+    members: [],
     logs: [],
     todos: [],
-    customHabits: [],
-    hiddenHabits: [],
+    habits: [],
     challenges: [],
     meetups: [],
     memories: [],
@@ -23,17 +25,20 @@ export function makeSeed(): GameState {
     savings: [],
     lessons: {},
     duels: [],
-    penalties: DEFAULT_PENALTIES,
-    settings: { penaltiesOn: true, penaltyCap: 20, liveSim: false },
+    penalties: DEFAULT_PENALTIES.map((p) => ({ ...p })),
+    settings: { penaltiesOn: true, penaltyCap: 20 },
     badges: {},
     levelSeen: {},
-    notifs: [
-      { id: "n0", ts: Date.now(), icon: "⛈️", title: "Welcome to Thunderstorms 'n' All!", body: "Complete today's quests, keep your streak, and out-thunder your cousins.", read: false },
-    ],
-    avatars: Object.fromEntries(COUSINS.map((c, i) => [c.id, { emoji: c.emoji, aura: i % 2 ? "storm" : "bolt" }])),
-    selfRatings,
+    notifs: [],
+    notifsSeen: {},
+    selfRatings: {},
     restDays: {},
     boxOpened: {},
     savingsTarget: {},
   };
+}
+
+export function toStored(g: GameState): StoredGame {
+  const { members: _members, ...rest } = g;
+  return rest;
 }

@@ -2,3 +2,7 @@ node_modules
 .next
 next-env.d.ts
 *.tsbuildinfo
+
+# user data: accounts, sessions and the game database (never commit)
+/data
+.env*.local

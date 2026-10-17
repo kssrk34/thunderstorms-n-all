@@ -2,71 +2,119 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Thunderstorms 'n' All: calm, Apple-inspired surfaces with a quiet storm
+ * personality. Midnight navy, storm grey, cloud white, muted electric blue,
+ * and a lightning accent used sparingly for XP and milestones.
+ */
 @layer base {
   :root {
-    --background: 228 48% 6%;
-    --foreground: 214 40% 96%;
-    --card: 228 38% 11%;
-    --card-foreground: 214 40% 96%;
-    --primary: 199 95% 60%;
-    --primary-foreground: 228 48% 6%;
-    --secondary: 262 70% 62%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 228 28% 16%;
-    --muted-foreground: 220 15% 68%;
-    --accent: 48 96% 53%;
-    --accent-foreground: 228 48% 6%;
-    --destructive: 0 80% 62%;
+    --background: 220 23% 97%;
+    --foreground: 224 40% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 40% 10%;
+    --popover: 0 0% 100%;
+    --primary: 222 84% 57%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 18% 94%;
+    --secondary-foreground: 224 40% 10%;
+    --muted: 220 18% 94%;
+    --muted-foreground: 220 9% 44%;
+    --accent: 40 90% 52%;
+    --accent-foreground: 224 40% 10%;
+    --success: 152 52% 38%;
+    --destructive: 0 72% 52%;
     --destructive-foreground: 0 0% 100%;
-    --border: 228 30% 22%;
-    --input: 228 30% 22%;
-    --ring: 199 95% 60%;
-    --radius: 1rem;
+    --border: 220 14% 90%;
+    --input: 220 14% 88%;
+    --ring: 222 84% 57%;
+    --radius: 1.25rem;
+    --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 6px 20px -12px rgb(16 24 40 / 0.14);
+    --shadow-float: 0 16px 48px -16px rgb(16 24 40 / 0.28);
   }
+  .dark {
+    --background: 225 45% 6%;
+    --foreground: 220 25% 95%;
+    --card: 224 33% 10%;
+    --card-foreground: 220 25% 95%;
+    --popover: 224 30% 12%;
+    --primary: 221 92% 68%;
+    --primary-foreground: 225 45% 7%;
+    --secondary: 223 24% 15%;
+    --secondary-foreground: 220 25% 95%;
+    --muted: 223 24% 15%;
+    --muted-foreground: 218 14% 62%;
+    --accent: 43 90% 62%;
+    --accent-foreground: 225 45% 7%;
+    --success: 152 46% 52%;
+    --destructive: 0 72% 63%;
+    --border: 223 24% 16%;
+    --input: 223 22% 22%;
+    --ring: 221 92% 68%;
+    --shadow-card: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 12px 32px -18px rgb(0 0 0 / 0.8);
+    --shadow-float: 0 20px 56px -16px rgb(0 0 0 / 0.75);
+  }
+
   * { @apply border-border; }
-  html { color-scheme: dark; }
+  html { color-scheme: light; -webkit-tap-highlight-color: transparent; }
+  html.dark { color-scheme: dark; }
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    background-image:
-      radial-gradient(900px 500px at 85% -10%, rgba(139, 92, 246, 0.22), transparent 60%),
-      radial-gradient(700px 450px at -5% 10%, rgba(56, 189, 248, 0.16), transparent 60%),
-      radial-gradient(600px 400px at 50% 110%, rgba(250, 204, 21, 0.07), transparent 60%);
-    background-attachment: fixed;
+    @apply bg-background font-sans text-foreground antialiased;
     min-height: 100dvh;
+    font-feature-settings: "cv11", "ss01", "ss03";
+    text-rendering: optimizeLegibility;
   }
-  h1, h2, h3, .font-display { font-family: var(--font-display), system-ui, sans-serif; letter-spacing: -0.01em; }
-  ::selection { background: rgba(250, 204, 21, .35); }
-  ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-thumb { background: hsl(var(--muted)); border-radius: 8px; }
+  h1, h2, h3 { letter-spacing: -0.022em; }
+  ::selection { background: hsl(var(--primary) / 0.2); }
+  :focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; border-radius: 6px; }
+  input[type="range"] { accent-color: hsl(var(--primary)); }
 }
 
 @layer components {
-  .glass {
-    background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02));
-    border: 1px solid rgba(255,255,255,.09);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    box-shadow: 0 10px 30px -12px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.05);
+  .field {
+    @apply h-11 w-full min-w-0 rounded-xl border border-transparent bg-secondary px-3.5 text-[15px] text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/40 focus:bg-card focus:ring-4 focus:ring-primary/10;
   }
-  .glow-blue { box-shadow: 0 0 28px -4px rgba(56,189,248,.45); }
-  .glow-volt { box-shadow: 0 0 28px -4px rgba(250,204,21,.5); }
-  .text-grad {
-    background: linear-gradient(90deg, #38bdf8, #8b5cf6 55%, #facc15);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
+  textarea.field { @apply h-auto min-h-[88px] resize-none py-3 leading-relaxed; }
+  select.field {
+    appearance: none;
+    padding-right: 2.25rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%238A94A6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.9rem center;
   }
-  .bar-shimmer {
-    background-image: linear-gradient(90deg, #38bdf8, #8b5cf6, #facc15, #8b5cf6, #38bdf8);
-    background-size: 200% 100%;
-    animation: shimmer 3s linear infinite;
-  }
-  .chip { @apply inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs font-medium; }
+  .label { @apply mb-1.5 block text-[13px] font-medium text-muted-foreground; }
+  .eyebrow { @apply text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground; }
+  .tabular { font-variant-numeric: tabular-nums; }
   /* let grid columns shrink below their content's intrinsic width on phones */
   .grid > * { min-width: 0; }
-  .input-base {
-    @apply w-full min-w-0 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/70 outline-none transition focus:border-primary/70 focus:ring-2 focus:ring-primary/30;
+  .pb-tabbar { padding-bottom: calc(env(safe-area-inset-bottom) + 6.5rem); }
+  /* soft edges on horizontal scrollers */
+  .fade-x { mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 28px), transparent); }
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+
+  /* Atmosphere: soft storm-cloud light for brand moments only */
+  .sky {
+    background:
+      radial-gradient(120% 70% at 50% -12%, hsl(221 60% 86% / 0.9), transparent 62%),
+      radial-gradient(55% 45% at 88% 18%, hsl(226 40% 90% / 0.9), transparent 70%),
+      radial-gradient(60% 50% at 6% 34%, hsl(214 30% 90% / 0.8), transparent 70%),
+      linear-gradient(180deg, hsl(220 30% 95%), hsl(220 23% 97%));
   }
-  .pad-safe { padding-bottom: calc(env(safe-area-inset-bottom) + 5.5rem); }
+  .dark .sky, .storm {
+    background:
+      radial-gradient(120% 70% at 50% -12%, hsl(222 55% 20% / 0.95), transparent 62%),
+      radial-gradient(55% 45% at 88% 18%, hsl(228 38% 24% / 0.6), transparent 70%),
+      radial-gradient(60% 50% at 6% 34%, hsl(216 28% 20% / 0.55), transparent 70%),
+      linear-gradient(180deg, hsl(226 48% 9%), hsl(225 45% 5%));
+  }
 }
 
-input[type="range"] { accent-color: #facc15; }
-select.input-base option { background: #11162b; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -3,11 +3,12 @@ import * as React from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { cn } from "@/lib/utils";
 
+/** iOS-style segmented control. */
 export const Tabs = TabsPrimitive.Root;
 export const TabsList = React.forwardRef<React.ElementRef<typeof TabsPrimitive.List>, React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>>(
   ({ className, ...p }, ref) => (
-    <TabsPrimitive.List ref={ref} className={cn("inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-white/10 bg-white/5 p-1", className)} {...p} />
-  )
+    <TabsPrimitive.List ref={ref} className={cn("no-scrollbar inline-flex max-w-full items-center overflow-x-auto rounded-[11px] bg-secondary p-[3px]", className)} {...p} />
+  ),
 );
 TabsList.displayName = "TabsList";
 export const TabsTrigger = React.forwardRef<React.ElementRef<typeof TabsPrimitive.Trigger>, React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>>(
@@ -15,15 +16,15 @@ export const TabsTrigger = React.forwardRef<React.ElementRef<typeof TabsPrimitiv
     <TabsPrimitive.Trigger
       ref={ref}
       className={cn(
-        "whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-all hover:text-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-sky-500/30 data-[state=active]:to-violet-500/30 data-[state=active]:text-foreground data-[state=active]:shadow",
-        className
+        "flex-1 whitespace-nowrap rounded-[8px] px-3.5 py-1.5 text-[13px] font-medium text-muted-foreground transition-all duration-200 hover:text-foreground data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[0_1px_3px_rgba(16,24,40,.12),0_0_0_.5px_rgba(16,24,40,.04)] dark:data-[state=active]:bg-[hsl(223_20%_24%)]",
+        className,
       )}
       {...p}
     />
-  )
+  ),
 );
 TabsTrigger.displayName = "TabsTrigger";
 export const TabsContent = React.forwardRef<React.ElementRef<typeof TabsPrimitive.Content>, React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>>(
-  ({ className, ...p }, ref) => <TabsPrimitive.Content ref={ref} className={cn("mt-4 focus-visible:outline-none", className)} {...p} />
+  ({ className, ...p }, ref) => <TabsPrimitive.Content ref={ref} className={cn("mt-5 focus-visible:outline-none data-[state=active]:animate-fade-up", className)} {...p} />,
 );
 TabsContent.displayName = "TabsContent";

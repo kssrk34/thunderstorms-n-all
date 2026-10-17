@@ -1,164 +1,148 @@
-import type { Cousin, DimId, Habit, PenaltyDef } from "./types";
+import type { DimId, PenaltyDef } from "./types";
 
-export interface Dim { id: DimId; name: string; emoji: string; color: string; blurb: string }
+export interface Dim { id: DimId; name: string; short: string; color: string; blurb: string }
 
 // 12 life areas, inspired by the Lifebook framework and adapted for cousins in their 20s.
 export const DIMS: Dim[] = [
-  { id: "health", name: "Health & Fitness", emoji: "💪", color: "#34d399", blurb: "Energy, strength, sleep, food" },
-  { id: "mind", name: "Mind & Learning", emoji: "🧠", color: "#38bdf8", blurb: "Skills, books, curiosity" },
-  { id: "emotional", name: "Emotional Life", emoji: "🌊", color: "#a78bfa", blurb: "Mood, resilience, self-talk" },
-  { id: "career", name: "Career & Craft", emoji: "🚀", color: "#facc15", blurb: "Work, growth, networking" },
-  { id: "money", name: "Money & Freedom", emoji: "🪙", color: "#fbbf24", blurb: "Saving, budgeting, literacy" },
-  { id: "family", name: "Family & Cousins", emoji: "🏡", color: "#fb7185", blurb: "Parents, cousins, traditions" },
-  { id: "friends", name: "Friends & Community", emoji: "🤝", color: "#f472b6", blurb: "Friendships and belonging" },
-  { id: "creativity", name: "Creativity & Play", emoji: "🎨", color: "#c084fc", blurb: "Hobbies, art, music, fun" },
-  { id: "giving", name: "Contribution", emoji: "🌱", color: "#4ade80", blurb: "Volunteering and giving back" },
-  { id: "calm", name: "Inner Calm", emoji: "🧘", color: "#2dd4bf", blurb: "Mindfulness, stillness, faith" },
-  { id: "adventure", name: "Adventure & Life", emoji: "🏔️", color: "#fb923c", blurb: "Trips, new experiences" },
-  { id: "vision", name: "Vision & Purpose", emoji: "🧭", color: "#60a5fa", blurb: "Direction and long-term goals" },
+  { id: "health", name: "Health & Fitness", short: "Health", color: "#34A37B", blurb: "Energy, strength, sleep, food" },
+  { id: "mind", name: "Mind & Learning", short: "Learning", color: "#4C7DFF", blurb: "Skills, books, curiosity" },
+  { id: "emotional", name: "Emotional Life", short: "Emotional", color: "#6D6AE8", blurb: "Mood, resilience, self-talk" },
+  { id: "career", name: "Career & Craft", short: "Career", color: "#E09B3D", blurb: "Work, growth, networking" },
+  { id: "money", name: "Money & Freedom", short: "Money", color: "#2E9FB3", blurb: "Saving, budgeting, literacy" },
+  { id: "family", name: "Family & Cousins", short: "Family", color: "#E06C7A", blurb: "Parents, cousins, traditions" },
+  { id: "friends", name: "Friends & Community", short: "Friends", color: "#E8845C", blurb: "Friendships and belonging" },
+  { id: "creativity", name: "Creativity & Play", short: "Creativity", color: "#A06CD5", blurb: "Hobbies, art, music, fun" },
+  { id: "giving", name: "Contribution", short: "Giving", color: "#7DAA3C", blurb: "Volunteering and giving back" },
+  { id: "calm", name: "Inner Calm", short: "Calm", color: "#4AA8A0", blurb: "Mindfulness, stillness, faith" },
+  { id: "adventure", name: "Adventure & Life", short: "Adventure", color: "#C8794B", blurb: "Trips, new experiences" },
+  { id: "vision", name: "Vision & Purpose", short: "Purpose", color: "#5872B8", blurb: "Direction and long-term goals" },
 ];
 export const DIM = Object.fromEntries(DIMS.map((d) => [d.id, d])) as Record<DimId, Dim>;
+export const DIM_IDS = DIMS.map((d) => d.id);
 
-export const COUSINS: Cousin[] = [
-  { id: "arjun", name: "Arjun", role: "Software Engineer", city: "Hyderabad", area: "Gachibowli", emoji: "🧑‍💻", color: "#38bdf8",
-    bio: "Backend dev at a product startup. Cricket nerd, filter-coffee loyalist.", focus: "System design + staying active" },
-  { id: "karthik", name: "Karthik", role: "Software Engineer", city: "Hyderabad", area: "Madhapur", emoji: "🎧", color: "#8b5cf6",
-    bio: "Frontend engineer, weekend side-project builder, badminton regular.", focus: "Side projects + sleep" },
-  { id: "vignesh", name: "Vignesh", role: "Software Engineer", city: "Hyderabad", area: "Kondapur", emoji: "🛠️", color: "#facc15",
-    bio: "Cloud/DevOps engineer prepping for his next certification.", focus: "Certifications + saving ₹" },
-  { id: "meghana", name: "Meghana", role: "HR Professional", city: "Hyderabad", area: "Banjara Hills", emoji: "🌸", color: "#f472b6",
-    bio: "Talent partner who loves people, Kuchipudi and Sunday filter-kaapi.", focus: "HR craft + creative time" },
-  { id: "ananya", name: "Ananya", role: "MBA Student", city: "Bangalore", area: "Koramangala", emoji: "📚", color: "#34d399",
-    bio: "MBA at a Bangalore B-school, case-comp enthusiast, 7am Cubbon Park runner.", focus: "Finance + case prep + family calls" },
-];
-export const COUSIN = Object.fromEntries(COUSINS.map((c) => [c.id, c])) as Record<string, Cousin>;
+/** Five cousins, five accounts. */
+export const MAX_MEMBERS = 5;
 
-export const AVATARS: { emoji: string; level: number }[] = [
-  { emoji: "🧑‍💻", level: 1 }, { emoji: "🎧", level: 1 }, { emoji: "🛠️", level: 1 }, { emoji: "🌸", level: 1 }, { emoji: "📚", level: 1 },
-  { emoji: "🦊", level: 2 }, { emoji: "🐯", level: 3 }, { emoji: "🦅", level: 4 }, { emoji: "🐉", level: 6 },
-  { emoji: "⚡", level: 5 }, { emoji: "🔥", level: 7 }, { emoji: "👑", level: 9 },
-];
-export const AURAS: { id: string; name: string; level: number; from: string; to: string }[] = [
-  { id: "bolt", name: "Bolt Blue", level: 1, from: "#38bdf8", to: "#3b82f6" },
-  { id: "storm", name: "Storm Purple", level: 1, from: "#a78bfa", to: "#7c3aed" },
-  { id: "volt", name: "Volt Yellow", level: 3, from: "#fde047", to: "#f59e0b" },
-  { id: "ember", name: "Ember", level: 5, from: "#fb923c", to: "#ef4444" },
-  { id: "aurora", name: "Aurora", level: 8, from: "#34d399", to: "#38bdf8" },
+export const AVATAR_EMOJIS = ["⛅", "⚡", "🌙", "🌿", "🌊", "🌸", "🦊", "🦉", "🐯", "🐬", "🎧", "📚", "🎨", "🏔️", "☕", "🍀"];
+export const MEMBER_COLORS = ["#4C7DFF", "#6D6AE8", "#2E9FB3", "#34A37B", "#E09B3D", "#E06C7A", "#A06CD5", "#5F7A99"];
+
+export const INTERESTS = [
+  "Fitness", "Reading", "Music", "Cooking", "Travel", "Technology", "Art", "Movies",
+  "Cricket", "Badminton", "Photography", "Finance", "Writing", "Nature", "Yoga", "Dance",
 ];
 
-const H = (id: string, userId: string, title: string, emoji: string, dim: DimId, xp: number, tag?: string): Habit =>
-  ({ id, userId, title, emoji, dim, xp, tag });
-
-export const BASE_HABITS: Habit[] = [
-  // shared
-  H("water", "all", "Drink 3 litres of water", "💧", "health", 10, "water"),
-  H("move", "all", "Move 30 min (walk, yoga, sport)", "🏃", "health", 20, "workout"),
-  H("sleep", "all", "Lights out before 11:30 pm", "🌙", "health", 15, "sleep"),
-  H("gratitude", "all", "Write one gratitude line", "🙏", "emotional", 10, "journal"),
-  H("homefood", "all", "Eat one balanced home-style meal", "🍛", "health", 10, "meal"),
-  // Arjun
-  H("a-dsa", "arjun", "Solve 1 LeetCode problem", "🧩", "career", 20, "code"),
-  H("a-sd", "arjun", "30 min system design reading", "📐", "mind", 20, "study"),
-  H("a-gym", "arjun", "Gym or cricket nets session", "🏏", "health", 25, "workout"),
-  // Karthik
-  H("k-side", "karthik", "45 min on side project", "💡", "creativity", 25, "code"),
-  H("k-read", "karthik", "Read 20 pages", "📖", "mind", 15, "read"),
-  H("k-bad", "karthik", "Badminton or cycling", "🏸", "health", 20, "workout"),
-  // Vignesh
-  H("v-cert", "vignesh", "1 hour cert prep (AWS / CKA)", "☁️", "career", 25, "study"),
-  H("v-save", "vignesh", "Log today's UPI spends", "📲", "money", 10, "save"),
-  H("v-run", "vignesh", "Evening run or Surya Namaskar", "🌅", "health", 20, "workout"),
-  // Meghana
-  H("m-net", "meghana", "Reach out to 1 professional", "🔗", "career", 15, "network"),
-  H("m-hr", "meghana", "Learn 1 HR analytics / labour-law topic", "📊", "mind", 20, "study"),
-  H("m-dance", "meghana", "Kuchipudi / painting practice", "💃", "creativity", 20, "hobby"),
-  // Ananya
-  H("n-case", "ananya", "Solve 1 case / quant set", "📈", "career", 25, "study"),
-  H("n-news", "ananya", "Read Mint / ET for 15 min", "📰", "mind", 10, "read"),
-  H("n-call", "ananya", "Call family back home", "📞", "family", 15, "family"),
+/* ------------------------------------------------------------------ */
+/* Suggestions. Shown as optional ideas only; nothing here is ever     */
+/* saved to a profile unless the user picks it and confirms.           */
+/* ------------------------------------------------------------------ */
+export const GOAL_SUGGESTIONS: { title: string; dim: DimId }[] = [
+  { title: "Improve physical fitness", dim: "health" },
+  { title: "Develop a new skill", dim: "mind" },
+  { title: "Read more books", dim: "mind" },
+  { title: "Improve professional skills", dim: "career" },
+  { title: "Spend more time with family", dim: "family" },
+  { title: "Improve personal finances", dim: "money" },
 ];
 
+export type QuestKind = "daily" | "once" | "challenge";
+export const QUEST_SUGGESTIONS: { title: string; dim: DimId; kind: Exclude<QuestKind, "challenge">; emoji: string }[] = [
+  { title: "Walk for 20 minutes", dim: "health", kind: "daily", emoji: "🚶" },
+  { title: "Read 10 pages", dim: "mind", kind: "daily", emoji: "📖" },
+  { title: "Drink 8 glasses of water", dim: "health", kind: "daily", emoji: "💧" },
+  { title: "Call a cousin", dim: "family", kind: "once", emoji: "📞" },
+  { title: "Set up a monthly budget", dim: "money", kind: "once", emoji: "🪙" },
+  { title: "Cook a new recipe", dim: "creativity", kind: "once", emoji: "🍳" },
+];
+
+export const CHALLENGE_SUGGESTIONS: { title: string; desc: string; emoji: string; period: "daily" | "weekly" | "monthly"; scope: "solo" | "squad"; dim: DimId; target: number; unit: string }[] = [
+  { title: "Move every day", desc: "Any movement counts: a walk, yoga, a game.", emoji: "🏃", period: "weekly", scope: "solo", dim: "health", target: 7, unit: "days" },
+  { title: "Squad reading marathon", desc: "Read 300 pages together this month.", emoji: "📚", period: "monthly", scope: "squad", dim: "mind", target: 300, unit: "pages" },
+  { title: "Call the grandparents", desc: "Everyone calls a grandparent at least once.", emoji: "📞", period: "weekly", scope: "squad", dim: "family", target: 5, unit: "calls" },
+  { title: "Focused study hours", desc: "Clock focused learning hours this week.", emoji: "🎓", period: "weekly", scope: "solo", dim: "mind", target: 8, unit: "hours" },
+];
+
+export const QUEST_EMOJIS = ["✨", "🚶", "🏃", "💧", "📖", "🧘", "🎓", "💻", "🪙", "📞", "🍳", "🎨", "🌱", "🌙", "🏸", "🤝"];
+
+export const CHALLENGE_XP: Record<"daily" | "weekly" | "monthly", number> = { daily: 25, weekly: 100, monthly: 200 };
+export const QUEST_SIZES = [
+  { id: "small", label: "Small", xp: 10 },
+  { id: "medium", label: "Medium", xp: 15 },
+  { id: "big", label: "Big", xp: 25 },
+] as const;
+
+/* ------------------------------------------------------------------ */
+/* Activity catalog for "Log an activity"                              */
+/* ------------------------------------------------------------------ */
 export interface ActivityType {
-  id: string; label: string; emoji: string; dim: DimId; xp: number; tag: string; hint: string;
+  id: string; label: string; dim: DimId; xp: number; tag: string; hint: string;
 }
 export const ACTIVITIES: ActivityType[] = [
-  { id: "exercise", label: "Exercise", emoji: "🏋️", dim: "health", xp: 30, tag: "workout", hint: "e.g. KBR Park run, Gachibowli badminton, yoga" },
-  { id: "study", label: "Study / MBA prep", emoji: "🎓", dim: "mind", xp: 25, tag: "study", hint: "e.g. Marketing case, Finance chapter, GRE words" },
-  { id: "upskill", label: "Upskill / code", emoji: "⌨️", dim: "career", xp: 30, tag: "code", hint: "e.g. React course, Kubernetes lab, LeetCode set" },
-  { id: "read", label: "Read", emoji: "📚", dim: "mind", xp: 20, tag: "read", hint: "e.g. Atomic Habits ch. 4, Mint Long Reads" },
-  { id: "save", label: "Save money", emoji: "🪙", dim: "money", xp: 20, tag: "save", hint: "e.g. Moved ₹2,000 to SIP, cooked instead of ordering" },
-  { id: "volunteer", label: "Volunteer", emoji: "🌱", dim: "giving", xp: 40, tag: "volunteer", hint: "e.g. Teaching kids at a NGO, tree planting weekend" },
-  { id: "hobby", label: "Hobby / creative", emoji: "🎨", dim: "creativity", xp: 20, tag: "hobby", hint: "e.g. Kolam, guitar, photography, painting" },
-  { id: "family", label: "Family time", emoji: "👨‍👩‍👧", dim: "family", xp: 25, tag: "family", hint: "e.g. Dinner with Amma & Nanna, called Paatti" },
-  { id: "calm", label: "Meditate / pray", emoji: "🧘", dim: "calm", xp: 15, tag: "calm", hint: "e.g. 10 min meditation, temple visit, pranayama" },
-  { id: "cook", label: "Cooked a veg meal", emoji: "🥘", dim: "health", xp: 15, tag: "meal", hint: "e.g. Pesarattu, bisibele bath, millet pongal" },
-  { id: "friends", label: "Friends & community", emoji: "🤝", dim: "friends", xp: 20, tag: "friends", hint: "e.g. Coffee with an old friend, meetup group" },
-  { id: "explore", label: "Explore something new", emoji: "🧭", dim: "adventure", xp: 25, tag: "explore", hint: "e.g. Trek near Hyderabad, new cafe, Lalbagh walk" },
+  { id: "exercise", label: "Exercise", dim: "health", xp: 30, tag: "workout", hint: "e.g. KBR Park run, badminton, yoga" },
+  { id: "study", label: "Study", dim: "mind", xp: 25, tag: "study", hint: "e.g. A finance chapter, GRE words" },
+  { id: "upskill", label: "Upskill", dim: "career", xp: 30, tag: "code", hint: "e.g. A course module, a coding set" },
+  { id: "read", label: "Read", dim: "mind", xp: 20, tag: "read", hint: "e.g. Atomic Habits, chapter 4" },
+  { id: "save", label: "Save money", dim: "money", xp: 20, tag: "save", hint: "e.g. Cooked instead of ordering in" },
+  { id: "volunteer", label: "Volunteer", dim: "giving", xp: 40, tag: "volunteer", hint: "e.g. Teaching kids at an NGO" },
+  { id: "hobby", label: "Hobby", dim: "creativity", xp: 20, tag: "hobby", hint: "e.g. Guitar, photography, painting" },
+  { id: "family", label: "Family time", dim: "family", xp: 25, tag: "family", hint: "e.g. Dinner with Amma and Nanna" },
+  { id: "calm", label: "Meditate", dim: "calm", xp: 15, tag: "calm", hint: "e.g. 10 minutes of quiet, pranayama" },
+  { id: "cook", label: "Cook", dim: "health", xp: 15, tag: "meal", hint: "e.g. Pesarattu, millet pongal" },
+  { id: "friends", label: "Friends", dim: "friends", xp: 20, tag: "friends", hint: "e.g. Coffee with an old friend" },
+  { id: "explore", label: "Explore", dim: "adventure", xp: 25, tag: "explore", hint: "e.g. A trek, a new neighbourhood" },
 ];
 
 export const DEFAULT_PENALTIES: PenaltyDef[] = [
   { id: "p1", label: "Skipped a workout I committed to", xp: 10, dim: "health", on: true },
-  { id: "p2", label: "Junk / outside-food binge", xp: 8, dim: "health", on: true },
+  { id: "p2", label: "Junk food binge", xp: 8, dim: "health", on: true },
   { id: "p3", label: "Doomscrolling for 2+ hours", xp: 6, dim: "calm", on: true },
   { id: "p4", label: "Broke a promise to a cousin", xp: 8, dim: "family", on: true },
   { id: "p5", label: "Impulse purchase over budget", xp: 10, dim: "money", on: true },
   { id: "p6", label: "Stayed up past 1 am", xp: 6, dim: "health", on: true },
 ];
 
-export const MEALS: { id: string; label: string; emoji: string; balanced?: boolean }[] = [
-  { id: "idli", label: "Idli + sambar + chutney", emoji: "🍚", balanced: true },
-  { id: "pesarattu", label: "Pesarattu + upma", emoji: "🥞", balanced: true },
-  { id: "dosa", label: "Ragi / millet dosa", emoji: "🫓", balanced: true },
-  { id: "curdrice", label: "Curd rice + pickle", emoji: "🥣" },
-  { id: "meals", label: "Dal, rice, veg curry & rasam", emoji: "🍛", balanced: true },
-  { id: "sprouts", label: "Sprouts / chana salad", emoji: "🥗", balanced: true },
-  { id: "buttermilk", label: "Buttermilk (majjiga / mor)", emoji: "🥛" },
-  { id: "fruit", label: "Seasonal fruit bowl", emoji: "🍌" },
-  { id: "treat", label: "Mindful treat (mirchi bajji, gulab jamun…)", emoji: "😋" },
+export const MEALS: { id: string; label: string; balanced?: boolean }[] = [
+  { id: "idli", label: "Idli, sambar and chutney", balanced: true },
+  { id: "pesarattu", label: "Pesarattu and upma", balanced: true },
+  { id: "dosa", label: "Ragi or millet dosa", balanced: true },
+  { id: "curdrice", label: "Curd rice" },
+  { id: "meals", label: "Dal, rice, veg curry and rasam", balanced: true },
+  { id: "sprouts", label: "Sprouts or chana salad", balanced: true },
+  { id: "buttermilk", label: "Buttermilk" },
+  { id: "fruit", label: "Seasonal fruit" },
+  { id: "treat", label: "A mindful treat" },
 ];
 
-export const WORKOUTS = ["Gym", "Yoga", "Surya Namaskar", "Brisk walk", "Running", "Badminton", "Cricket", "Cycling", "Swimming", "Dance", "Home HIIT"];
+export const WORKOUTS = ["Walk", "Run", "Gym", "Yoga", "Surya Namaskar", "Badminton", "Cricket", "Cycling", "Swimming", "Dance", "Home workout"];
 
 export const LESSONS: { id: string; title: string; blurb: string }[] = [
   { id: "emerg", title: "Emergency fund 101", blurb: "Aim for 3–6 months of expenses in a liquid fund or savings account." },
-  { id: "sip", title: "SIP vs lump-sum", blurb: "Small monthly SIPs in index funds beat waiting for the 'perfect time'." },
+  { id: "sip", title: "SIP vs lump sum", blurb: "Small monthly SIPs in index funds beat waiting for the perfect time." },
   { id: "cc", title: "Credit card traps", blurb: "Always pay the full bill. Revolving interest can cross 40% a year." },
   { id: "tax", title: "Old vs new tax regime", blurb: "Compare deductions (80C, HRA) with the lower new-regime slabs before choosing." },
   { id: "upi", title: "UPI budgeting", blurb: "Use monthly UPI summaries to tag needs, wants and savings." },
-  { id: "ppf", title: "PPF, EPF & NPS basics", blurb: "Long-term, tax-efficient, low-risk buckets of your portfolio." },
+  { id: "ppf", title: "PPF, EPF and NPS basics", blurb: "Long-term, tax-efficient, low-risk buckets of your portfolio." },
 ];
 
-export const CAREER_QUICK: Record<string, { id: string; label: string; emoji: string; xp: number; dim: DimId; tag: string }[]> = {
-  arjun: [
-    { id: "dsa", label: "Solved a DSA problem", emoji: "🧩", xp: 10, dim: "career", tag: "code" },
-    { id: "sd", label: "Studied a system-design topic", emoji: "📐", xp: 15, dim: "mind", tag: "study" },
-    { id: "pr", label: "Merged a meaningful PR", emoji: "🔀", xp: 20, dim: "career", tag: "code" },
-  ],
-  karthik: [
-    { id: "commit", label: "Shipped a side-project feature", emoji: "🚢", xp: 20, dim: "creativity", tag: "code" },
-    { id: "talk", label: "Learned from a tech talk / blog", emoji: "🎤", xp: 10, dim: "mind", tag: "study" },
-    { id: "oss", label: "Open-source contribution", emoji: "🌍", xp: 25, dim: "career", tag: "code" },
-  ],
-  vignesh: [
-    { id: "lab", label: "Finished a cloud lab", emoji: "☁️", xp: 15, dim: "career", tag: "code" },
-    { id: "mock", label: "Took a mock exam", emoji: "📝", xp: 20, dim: "mind", tag: "study" },
-    { id: "iac", label: "Automated something with IaC", emoji: "⚙️", xp: 20, dim: "career", tag: "code" },
-  ],
-  meghana: [
-    { id: "net", label: "Networked with a professional", emoji: "🔗", xp: 10, dim: "career", tag: "network" },
-    { id: "hr", label: "Studied an HR / people-analytics topic", emoji: "📊", xp: 15, dim: "mind", tag: "study" },
-    { id: "mentor", label: "Mentored or coached someone", emoji: "🌟", xp: 25, dim: "giving", tag: "network" },
-  ],
-  ananya: [
-    { id: "case", label: "Solved a case study", emoji: "📈", xp: 15, dim: "career", tag: "study" },
-    { id: "mba", label: "1 hour MBA study block", emoji: "🎓", xp: 12, dim: "mind", tag: "study" },
-    { id: "alumni", label: "Spoke with an alum / recruiter", emoji: "🎯", xp: 15, dim: "career", tag: "network" },
-  ],
-};
+/** Role-agnostic quick logs for the Career page. XP is fixed here so the server never trusts a client-sent amount. */
+export const CAREER_QUICK: { id: string; label: string; xp: number; dim: DimId; tag: string }[] = [
+  { id: "deep", label: "Did a focused deep-work session", xp: 15, dim: "career", tag: "code" },
+  { id: "learn", label: "Learned from a course, talk or article", xp: 10, dim: "mind", tag: "study" },
+  { id: "practice", label: "Practised a core skill", xp: 15, dim: "career", tag: "study" },
+  { id: "ship", label: "Finished something meaningful", xp: 20, dim: "career", tag: "code" },
+  { id: "network", label: "Connected with someone in my field", xp: 10, dim: "career", tag: "network" },
+  { id: "mentor", label: "Helped or mentored someone", xp: 20, dim: "giving", tag: "network" },
+];
 
 export const PLACES = [
-  "Hussain Sagar lakeside", "Chutneys, Banjara Hills", "Ram Ki Bandi, Gachibowli", "Shilparamam", "Durgam Cheruvu",
-  "Charminar evening + Irani chai", "Lamakaan", "Wonderla Hyderabad", "Nandi Hills sunrise", "MTR, Bangalore",
-  "Lalbagh Botanical Garden", "Cubbon Park", "Home – Sunday lunch", "Prasads IMAX", "Kakatiya Cafe",
+  "Hussain Sagar", "Chutneys, Banjara Hills", "Shilparamam", "Durgam Cheruvu", "Charminar", "Lamakaan",
+  "Nandi Hills", "MTR, Bangalore", "Lalbagh", "Cubbon Park", "Home, Sunday lunch",
 ];
-export const MEETUP_KINDS = ["Veg dinner", "Outing", "Trip", "Festival", "Game night", "Workout together", "Study jam", "Movie", "Birthday"];
+export const MEETUP_KINDS = ["Dinner", "Outing", "Trip", "Festival", "Game night", "Workout together", "Study session", "Movie", "Birthday"];
+
+export const HANGOUT_IDEAS = [
+  { title: "Board game night", desc: "Pallanguzhi, Ludo, or something new" },
+  { title: "Cook-off", desc: "Teams of two, the parents judge" },
+  { title: "Badminton doubles", desc: "Losers buy the filter coffee" },
+  { title: "A weekend visit", desc: "Go see whoever lives furthest away" },
+  { title: "Classic movie marathon", desc: "Everyone picks one film" },
+];

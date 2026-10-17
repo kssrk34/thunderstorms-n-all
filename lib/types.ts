@@ -6,16 +6,24 @@ export type LogKind =
   | "habit" | "activity" | "challenge" | "meetup" | "health" | "career"
   | "money" | "reflect" | "penalty" | "bonus" | "goal" | "todo";
 
-export interface Cousin {
+/** Public profile of a signed-up cousin. Comes from the accounts table, never from game data. */
+export interface Member {
   id: string;
   name: string;
-  role: string;
-  city: string;
-  area: string;
+  username: string;
   emoji: string;
   color: string;
-  bio: string;
-  focus: string;
+  /** URL of an uploaded profile picture, if any */
+  photo?: string;
+  bio?: string;
+  interests: string[];
+  joinedAt: number;
+}
+
+/** The signed-in user's own account details. */
+export interface Me extends Member {
+  role: "admin" | "member";
+  onboarded: boolean;
 }
 
 export interface LogEntry {
@@ -31,23 +39,30 @@ export interface LogEntry {
   ref?: string;
 }
 
+/** A daily quest: repeats every day. */
 export interface Habit {
   id: string;
-  userId: string; // cousin id or "all"
+  userId: string;
   title: string;
   emoji: string;
   dim: DimId;
   xp: number;
   tag?: string;
+  goalId?: string;
+  created: string;
 }
 
+/** A one-time quest. */
 export interface Todo {
   id: string;
   userId: string;
   title: string;
+  emoji?: string;
   dim: DimId;
   xp: number;
   done: boolean;
+  doneOn?: string;
+  goalId?: string;
   created: string;
 }
 
@@ -77,6 +92,7 @@ export interface Meetup {
   attendees: string[];
   note: string;
   xpEach: number;
+  by?: string;
 }
 
 export interface Memory {
@@ -95,13 +111,16 @@ export interface Goal {
   userId: string;
   title: string;
   dim: DimId;
-  cat: "career" | "learning" | "health" | "finance" | "hobby" | "personal";
+  why?: string;
+  /** Optional measurable target; goals without one are simply marked achieved. */
+  target?: number;
   current: number;
-  target: number;
-  unit: string;
+  unit?: string;
   xpPerStep: number;
-  due: string;
+  due?: string;
   done?: boolean;
+  doneOn?: string;
+  created: string;
 }
 
 export interface HealthDay {
@@ -160,28 +179,28 @@ export interface PenaltyDef {
   on: boolean;
 }
 
+export type NotifIcon = "bolt" | "trophy" | "level" | "badge" | "goal" | "users" | "rest" | "duel" | "quest";
+
 export interface Notif {
   id: string;
   ts: number;
-  icon: string;
+  icon: NotifIcon;
   title: string;
   body?: string;
-  read: boolean;
 }
 
 export interface Settings {
   penaltiesOn: boolean;
   penaltyCap: number;
-  liveSim: boolean;
 }
 
 export interface GameState {
   v: number;
-  activeId: string;
+  /** Injected from the accounts table at read time; never persisted with the game. */
+  members: Member[];
   logs: LogEntry[];
   todos: Todo[];
-  customHabits: Habit[];
-  hiddenHabits: string[];
+  habits: Habit[];
   challenges: Challenge[];
   meetups: Meetup[];
   memories: Memory[];
@@ -198,9 +217,20 @@ export interface GameState {
   badges: Record<string, Record<string, number>>;
   levelSeen: Record<string, number>;
   notifs: Notif[];
-  avatars: Record<string, { emoji: string; aura: string }>;
-  selfRatings: Record<string, Record<DimId, number>>;
+  /** user -> timestamp of the newest notification they have seen */
+  notifsSeen: Record<string, number>;
+  selfRatings: Record<string, Partial<Record<DimId, number>>>;
   restDays: Record<string, string[]>;
-  boxOpened: Record<string, string>; // user -> date of last surprise bolt
+  boxOpened: Record<string, string>; // user -> date of last daily spark
   savingsTarget: Record<string, number>;
+}
+
+/** The game as persisted on the server (profiles live with the accounts). */
+export type StoredGame = Omit<GameState, "members">;
+
+/** What the server sends a signed-in cousin. */
+export interface View {
+  rev: number;
+  me: Me;
+  game: GameState;
 }

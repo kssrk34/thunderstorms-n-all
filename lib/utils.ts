@@ -38,6 +38,8 @@ export function fmtShort(s: string): string {
 export function fmtDay(s: string): string {
   return parseD(s).toLocaleDateString("en-IN", { weekday: "short" });
 }
+/** "1 day", "3 days" */
+export const plural = (n: number, word: string, many = word + "s") => `${n} ${n === 1 ? word : many}`;
 export const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 export const uid = () => Math.random().toString(36).slice(2, 10);
 

@@ -1,0 +1,10 @@
+import { Atmosphere } from "@/components/brand";
+
+export default function AuthLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="sky relative min-h-dvh overflow-hidden">
+      <Atmosphere />
+      <div className="relative flex min-h-dvh flex-col">{children}</div>
+    </div>
+  );
+}

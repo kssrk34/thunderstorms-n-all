@@ -1,26 +1,34 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Space_Grotesk } from "next/font/google";
-import { Shell } from "@/components/shell";
-import { GameProvider } from "@/lib/store";
+import { Inter } from "next/font/google";
+import { ThemeWatcher } from "@/components/theme";
+import { THEME_SCRIPT } from "@/lib/theme-script";
 import "./globals.css";
 
-const body = Inter({ subsets: ["latin"], variable: "--font-body" });
-const display = Space_Grotesk({ subsets: ["latin"], variable: "--font-display", weight: ["500", "600", "700"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Thunderstorms 'n' All · Life, gamified for 5 cousins",
-  description: "A multiplayer life game for five cousins: quests, XP, streaks, a cousin league, and real-life meetups.",
-  icons: { icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛈️</text></svg>" },
+  title: { default: "Thunderstorms 'n' All", template: "%s · Thunderstorms 'n' All" },
+  description: "Five cousins. Five journeys. One extraordinary life.",
 };
-export const viewport: Viewport = { themeColor: "#070b1a", width: "device-width", initialScale: 1 };
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F5F6F9" },
+    { media: "(prefers-color-scheme: dark)", color: "#080C16" },
+  ],
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`dark ${body.variable} ${display.variable}`}>
+    <html lang="en" className={inter.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body>
-        <GameProvider>
-          <Shell>{children}</Shell>
-        </GameProvider>
+        <ThemeWatcher />
+        {children}
       </body>
     </html>
   );
