@@ -126,8 +126,20 @@ const fileBackend: Backend = {
   },
 };
 
-const REDIS_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-const REDIS_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+/** Upstash REST credentials, including names with a custom prefix chosen when connecting storage in Vercel. */
+function redisEnv(): { url?: string; token?: string } {
+  const env = process.env;
+  for (const [u, t] of [["KV_REST_API_URL", "KV_REST_API_TOKEN"], ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"]]) {
+    if (env[u] && env[t]) return { url: env[u], token: env[t] };
+  }
+  for (const key of Object.keys(env).sort()) {
+    const m = key.match(/^(.+_)(KV_REST_API|UPSTASH_REDIS_REST)_URL$/);
+    const token = m && env[`${m[1]}${m[2]}_TOKEN`];
+    if (m && env[key] && token) return { url: env[key], token };
+  }
+  return {};
+}
+const { url: REDIS_URL, token: REDIS_TOKEN } = redisEnv();
 const PREFIX = process.env.TNA_REDIS_PREFIX || "tna";
 const K = { db: `${PREFIX}:db`, ver: `${PREFIX}:ver`, backup: `${PREFIX}:backup` };
 // Writes the document only if nobody else has written since we read it.
