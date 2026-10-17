@@ -18,7 +18,7 @@ function SignupForm() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api<{ needsSetup: boolean; members: number; max: number }>("/api/setup").then((r) => r.ok && setSetup(r.data));
+    api<{ needsSetup: boolean; members: number; max: number }>("/api/setup").then((r) => (r.ok ? setSetup(r.data) : setError(r.error)));
   }, []);
   useEffect(() => {
     const code = params.get("code");
