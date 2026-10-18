@@ -15,8 +15,8 @@ A private life-gamification web app for five cousins (Hyderabad and Bangalore, i
 - `main` is production. **Every push to `main` deploys to Vercel production**; other branches get preview deploys. Vercel is connected through its GitHub integration.
 - Latest production commit: "Add password recovery" (2026-10-18; see `git log`). Before it came `b8003bb` (an empty commit to redeploy after `TNA_SETUP_CODE` was added), with the real changes in `07fb787`, `a3e2a85` and `72c80a5`.
 - Vercel project `thunderstorms-n-all` has an **Upstash Redis** database connected (its credentials are auto-detected) and `TNA_SETUP_CODE` set. The code's value is only in Vercel; it isn't recorded here.
-- As of the last check, the live site had **no accounts yet** (`/api/setup` returned `needsSetup: true`).
-- Next step for the owner: open the live site → Get Started → enter the setup code → create the organiser account → Settings → Cousins → Invite (one single-use link per cousin, valid 7 days).
+- As of 2026-10-18 the live site has **real accounts: 4 of 5 members** (`/api/setup` returned `members: 4`). Treat production data as real. Migration 3 ran against it after a pre-migration backup.
+- The organiser invites the remaining cousin from Settings → Cousins → Invite (one single-use link, valid 7 days).
 - Branch `redesign-accounts-onboarding` was fast-forwarded into `main` and can be deleted.
 - Local `data/` holds a fresh, empty dev database (git-ignored). Local dev data is separate from production.
 - 2026-10-18: password recovery was added and deployed (organiser-made reset links, organiser recovery with the setup code, migration 3).
