@@ -36,6 +36,7 @@ export default function Login() {
         </Field>
         <FormError>{error}</FormError>
         <Button type="submit" size="lg" className="w-full" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</Button>
+        <div className="text-center"><Link href="/forgot" className="text-[15px] text-primary hover:opacity-80">Forgot password?</Link></div>
       </form>
     </AuthFrame>
   );

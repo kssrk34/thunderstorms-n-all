@@ -25,6 +25,15 @@ npm run build && npm start   # production
 
 Every new account starts completely empty: no quests, goals, activity or achievements. Onboarding walks each cousin through their profile, their goals and a first quest (all optional, all their own).
 
+### Forgotten passwords
+
+The app doesn't collect email addresses, so the organiser handles password resets. Nobody's quests, goals or progress are touched.
+
+- **A cousin forgot theirs.** The organiser opens **Settings → Cousins** and taps the key next to that cousin. This makes a reset link that works once and expires after 24 hours. The organiser sends it to the cousin, who opens it, chooses a new password and is signed in. Their old password keeps working until the link is used. A new link replaces any earlier one, and a waiting link can be cancelled.
+- **The organiser forgot theirs.** On the sign-in screen, tap **Forgot password? → Use setup code**, then enter `TNA_SETUP_CODE` and a new password. This works only when `TNA_SETUP_CODE` is set on the server and has at least 8 letters or numbers. After 10 wrong codes in an hour, it pauses until the hour is up.
+
+Either way, the account is signed out on every other device. The setup code is the organiser's recovery key, so keep it private. To change it, update it in the hosting settings and redeploy.
+
 ## Hosting
 
 The squad's data is one small JSON document. Where it lives depends on the host:
@@ -35,7 +44,7 @@ The squad's data is one small JSON document. Where it lives depends on the host:
 | Variable | Default | Purpose |
 |---|---|---|
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN` | unset | Upstash Redis REST credentials (Vercel sets these). `UPSTASH_REDIS_REST_URL`/`_TOKEN` also work. |
-| `TNA_SETUP_CODE` | random, printed in the logs | Code for creating the first account. Set it on Vercel so you don't have to dig through logs. |
+| `TNA_SETUP_CODE` | random, printed in the logs | Code for creating the first account. Afterwards it's the organiser's password recovery key, which only works when this variable is set. Set it on Vercel and keep it private. |
 | `TNA_DATA_DIR` | `./data` | File storage location when Redis isn't configured. |
 | `TNA_REDIS_PREFIX` | `tna` | Key prefix, if the Redis database is shared. |
 
@@ -47,6 +56,7 @@ Serve it over HTTPS in production. Session cookies are marked `Secure` automatic
 - A daily snapshot is kept for 14 days (`data/backups/daily-*.json`, or the `tna:backup:daily:*` keys in Redis).
 - Schema changes run as numbered migrations in `lib/server/migrations.ts`. Each runs once, after the data is backed up (`pre-migration-*`). Normal startup and redeploys never reset or clear data.
 - Migration 2 removes demo content left by earlier builds: anything owned by an id that isn't a real account. Real accounts and everything they own are untouched.
+- Migration 3 adds an empty list for password reset links. It changes nothing else.
 - If the stored data can't be parsed, the server refuses to continue rather than overwrite it.
 - The previous version stored a demo game in each browser's localStorage. The new app backs that up under a separate key, removes the demo copy, and offers the backup as a download in Settings.
 - `data/` is git-ignored. Never commit it.
@@ -54,7 +64,8 @@ Serve it over HTTPS in production. Session cookies are marked `Secure` automatic
 ## Security
 
 - Passwords are hashed with scrypt and a per-user salt. Sessions are random 256-bit tokens in an `HttpOnly`, `SameSite=Lax` cookie; only a SHA-256 of the token is stored. Sessions last 30 days and slide forward with use; changing your password signs out your other devices.
-- Sign-in, sign-up and invite checks are rate-limited (per server instance, so the limit is looser on serverless). Cross-site writes are rejected by an Origin check.
+- Password reset links carry a random 192-bit token after the `#`, so browsers never send it to the server in a page request or in a `Referer` header. Only a SHA-256 of the token is stored, and the link is shown to the organiser once. Only the organiser can make reset links. Using one, or recovering with the setup code, ends every session on that account.
+- Sign-in, sign-up, invite checks and password resets are rate-limited (per server instance, so the limit is looser on serverless). Organiser recovery also has a limit stored with the data, so it holds across every instance. Cross-site writes are rejected by an Origin check.
 - The server is the source of truth for the game. Every action is validated and run by the reducer as the signed-in user, so a client can't award itself XP or change another cousin's quests, goals or data. Squad rules (slip-ups) can only be changed by the organiser.
 - Each cousin's view is filtered on the server: personal things (one-time quests, health, mood, weekly reviews, savings notes, slip-up details) are only sent to their owner.
 
@@ -63,6 +74,7 @@ Serve it over HTTPS in production. Session cookies are marked `Secure` automatic
 | Route | What it does |
 |---|---|
 | `/welcome`, `/signup`, `/login` | Welcome screen, account creation (invite or setup code), sign-in |
+| `/forgot`, `/reset` | What to do about a forgotten password (organiser recovery with the setup code), and the page a reset link opens |
 | `/onboarding` | Profile → goals → first quest → done |
 | `/` | Today: activity rings, today's quests, goals, this week's league, daily spark |
 | `/quests` | Daily quests, one-time quests and challenges (solo or with cousins) |
@@ -70,7 +82,7 @@ Serve it over HTTPS in production. Session cookies are marked `Secure` automatic
 | `/league` | Cousins: standings, squad charge, recent activity, duels, weekly standouts |
 | `/health`, `/career`, `/money`, `/reflect`, `/life`, `/bonding` | Life areas: wellness, career reps, savings, mood and reviews, life balance, meetups |
 | `/profile` | Your profile, level and achievements |
-| `/settings` | Appearance, invitations, squad rules, password, your data |
+| `/settings` | Appearance, invitations and reset links, squad rules, password, your data |
 
 ## Design
 
@@ -91,5 +103,5 @@ Apple-inspired and calm, with a quiet thunderstorm personality: midnight navy, s
 - `lib/catalog.ts`: life areas, suggestions, activities, lessons
 - `lib/store.tsx`: client state, optimistic updates, syncing with the server
 - `lib/server/`: database, migrations, auth, per-user views, HTTP helpers
-- `app/api/`: auth, state, actions, profile, invitations, avatars
+- `app/api/`: auth (including password resets and organiser recovery), state, actions, profile, invitations, reset links, avatars
 - `components/`: shell (navigation, sheets, toasts, milestones), forms, brand, UI primitives

@@ -6,7 +6,7 @@ import { emptyGame, toStored } from "../seed";
  * startup never resets or clears data: only a migration may change stored
  * content, and only in the specific way it describes.
  */
-export const LATEST_SCHEMA = 2;
+export const LATEST_SCHEMA = 3;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Raw = any;
@@ -28,6 +28,12 @@ const MIGRATIONS: Record<number, { name: string; up: (db: Raw) => void }> = {
     up(db) {
       const removed = purgeDemoContent(db);
       if (removed) console.log(`[thunderstorms] migration 2: removed ${removed} demo item(s) not owned by a real account`);
+    },
+  },
+  3: {
+    name: "password reset links",
+    up(db) {
+      db.resets ??= [];
     },
   },
 };

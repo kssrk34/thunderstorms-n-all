@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC = new Set(["/welcome", "/login", "/signup"]);
+const PUBLIC = new Set(["/welcome", "/login", "/signup", "/forgot", "/reset"]);
 
 /**
  * Fast routing on whether a session cookie exists. The cookie itself is

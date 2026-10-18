@@ -1,6 +1,6 @@
 # Thunderstorms 'n' All: project handoff
 
-Context for continuing this project in a new session. Read this first, then `README.md` for setup and hosting details. Last updated 2026-10-17.
+Context for continuing this project in a new session. Read this first, then `README.md` for setup and hosting details. Last updated 2026-10-18.
 
 ## What it is
 
@@ -13,12 +13,13 @@ A private life-gamification web app for five cousins (Hyderabad and Bangalore, i
 ## Current state
 
 - `main` is production. **Every push to `main` deploys to Vercel production**; other branches get preview deploys. Vercel is connected through its GitHub integration.
-- Latest production commit: `b8003bb` (an empty commit to redeploy after `TNA_SETUP_CODE` was added). Real changes are in `07fb787`, `a3e2a85` and `72c80a5`.
+- Latest production commit: "Add password recovery" (2026-10-18; see `git log`). Before it came `b8003bb` (an empty commit to redeploy after `TNA_SETUP_CODE` was added), with the real changes in `07fb787`, `a3e2a85` and `72c80a5`.
 - Vercel project `thunderstorms-n-all` has an **Upstash Redis** database connected (its credentials are auto-detected) and `TNA_SETUP_CODE` set. The code's value is only in Vercel; it isn't recorded here.
 - As of the last check, the live site had **no accounts yet** (`/api/setup` returned `needsSetup: true`).
 - Next step for the owner: open the live site → Get Started → enter the setup code → create the organiser account → Settings → Cousins → Invite (one single-use link per cousin, valid 7 days).
 - Branch `redesign-accounts-onboarding` was fast-forwarded into `main` and can be deleted.
 - Local `data/` holds a fresh, empty dev database (git-ignored). Local dev data is separate from production.
+- 2026-10-18: password recovery was added and deployed (organiser-made reset links, organiser recovery with the setup code, migration 3).
 
 ## The brief we worked from (summary)
 
@@ -35,6 +36,7 @@ The owner pasted a brief titled "Project Thunderstorms 'n' All: website redesign
 - **Quests** come in three kinds: Daily (the `Habit` type), One-time (`Todo`), and Challenge (`Challenge`: a target plus a deadline, solo or with cousins, shared or individual target). Quests can link to a goal.
 - **Goals**: optional measurable target and unit, optional due date and "why", or simply marked achieved.
 - **Accounts**: setup code for the first (organiser) account, invite links for the rest, five-member cap, scrypt passwords, HttpOnly session cookies (30 days, sliding), rate limits, Origin check on writes, password change (signs out other devices), photo upload (resized to 320px JPEG in the browser).
+- **Forgotten passwords**: there is no email, so recovery goes through the organiser. In Settings → Cousins the organiser taps the key next to a cousin to make a single-use reset link (`/reset#<token>`, valid 24 hours, only its SHA-256 is stored, a new link replaces the old one, shown once). The organiser recovers their own account at `/forgot` with `TNA_SETUP_CODE` (it must be set on the server and have at least 8 letters or numbers; after 10 wrong codes in an hour it pauses, counted in `meta.recovery` so all instances share the limit). Either way, every session on the account ends and the device that reset is signed in. Login links to `/forgot`.
 - **Onboarding**: `/onboarding` runs profile → goals → first quest → "You're all set". Middleware plus `GameProvider gate` send people to the right place.
 - **Removed**: the five hardcoded sample cousins, base habits auto-assigned to everyone, per-cousin career buttons, the "play as" switcher, the live simulation, and "reset all data".
 
@@ -49,17 +51,17 @@ The owner pasted a brief titled "Project Thunderstorms 'n' All: website redesign
 | Empty game | `lib/seed.ts` (`emptyGame`, `toStored`) |
 | Client state | `lib/store.tsx` (`GameProvider`, `useGame`, `useMember`, `newId`) |
 | Storage | `lib/server/db.ts` (`readDb`, `writeDb`, file or Redis backend) |
-| Migrations | `lib/server/migrations.ts` (`LATEST_SCHEMA = 2`) |
-| Auth | `lib/server/auth.ts` |
+| Migrations | `lib/server/migrations.ts` (`LATEST_SCHEMA = 3`) |
+| Auth | `lib/server/auth.ts` (sessions, passwords, `findReset`, `replacePassword`) |
 | Per-user filtering | `lib/server/view.ts` (`viewFor`) |
 | HTTP helpers | `lib/server/http.ts` (`withUser`, `sameOrigin`, `allow` rate limiter, `handleError`) |
-| API routes | `app/api/*`: `setup`, `auth/{signup,login,logout}`, `state`, `action`, `profile`, `profile/password`, `avatar/[id]`, `invites`, `invites/check` |
+| API routes | `app/api/*`: `setup`, `auth/{signup,login,logout,reset,reset/check,recover}`, `state`, `action`, `profile`, `profile/password`, `avatar/[id]`, `invites`, `invites/check`, `resets` (organiser only) |
 | Route gating | `middleware.ts` (cookie presence only; the APIs verify the session) |
-| Route groups | `app/(app)` (signed-in shell), `app/(auth)` (welcome, login, signup), `app/onboarding` |
+| Route groups | `app/(app)` (signed-in shell), `app/(auth)` (welcome, login, signup, forgot, reset), `app/onboarding` |
 
 **Data flow.** The server is the source of truth. The client applies an action optimistically with the same reducer, POSTs it to `/api/action`, and rebases any still-pending actions onto the server's reply. XP toasts and milestone celebrations come from comparing confirmed server states. The client polls `/api/state?rev=N` every 15 seconds and on focus; it gets a tiny "unchanged" reply when nothing moved.
 
-**Storage.** The whole squad is one JSON document: `{schema, rev, meta, users, sessions, invites, game}`. Member profiles live in `users` and are injected into `game.members` when the data is read.
+**Storage.** The whole squad is one JSON document: `{schema, rev, meta, users, sessions, invites, resets, game}`. Member profiles live in `users` and are injected into `game.members` when the data is read.
 - With `KV_REST_API_URL`/`KV_REST_API_TOKEN`, `UPSTASH_REDIS_REST_URL`/`_TOKEN`, or any `<prefix>_KV_REST_API_URL`/`_TOKEN` set, the app uses Upstash Redis over its REST API (keys `tna:db`, `tna:ver`, backups under `tna:backup:*`). Otherwise it uses the file `data/thunderstorms.json`.
 - On Vercel with no Redis credentials, it returns a 503 with instructions rather than losing data.
 - Writes are compare-and-set with jittered retries, so concurrent instances never overwrite each other. Concurrent loads in one instance share a single read.
@@ -88,7 +90,9 @@ The owner pasted a brief titled "Project Thunderstorms 'n' All: website redesign
 
 - Quests and goals can be added, completed and deleted, but not edited in place.
 - Updates from other cousins arrive by polling (about 15 seconds), not in real time.
-- Rate limits are in memory per server instance, so they are looser on serverless.
+- Rate limits are in memory per server instance, so they are looser on serverless. Organiser recovery also has a limit stored in the database for that reason.
+- `TNA_SETUP_CODE` is also the organiser's recovery key, so anyone who knows it can take over the organiser account. Changing it in Vercel and redeploying replaces the key.
+- The organiser can reset any cousin's password, which is a lot of trust in one person. A cousin notices when it happens because every one of their devices is signed out.
 - The whole squad is one document. Logs grow roughly a few MB a year, which is fine for five people; if it ever gets large, split logs out or archive old ones.
 - Put Vercel functions and the Upstash database in the same region (for cousins in India, both in Mumbai: Vercel `bom1`, Upstash `ap-south-1`) to keep requests fast.
 - The original brief's remaining sections (4 onward) were never received.

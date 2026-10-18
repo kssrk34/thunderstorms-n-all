@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
-import { Check, Copy, Download, LogOut, Plus, Share } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { Check, Copy, Download, KeyRound, LogOut, Plus, Share } from "lucide-react";
 import { FormError, PasswordInput } from "@/components/auth";
 import { Field } from "@/components/forms";
 import { AvatarView, DeleteButton, PageHeader, Section } from "@/components/game";
@@ -28,6 +29,7 @@ const RULES = [
 ];
 
 interface InviteSummary { members: number; max: number; open: number; invites: { code: string; expiresAt: number; by: string; mine: boolean }[]; code?: string }
+interface PendingReset { userId: string; expiresAt: number }
 
 export default function SettingsPage() {
   const { profile, signOut } = useGame();
@@ -69,12 +71,16 @@ function Cousins() {
   const { s, me, profile, toast } = useGame();
   const [inv, setInv] = useState<InviteSummary | null>(null);
   const [fresh, setFresh] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [resets, setResets] = useState<PendingReset[]>([]);
+  const [freshReset, setFreshReset] = useState<{ userId: string; token: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const admin = profile.role === "admin";
 
   useEffect(() => { api<InviteSummary>("/api/invites").then((r) => r.ok && setInv(r.data)); }, []);
+  useEffect(() => { if (admin) api<{ pending: PendingReset[] }>("/api/resets").then((r) => r.ok && setResets(r.data.pending)); }, [admin]);
   const link = (code: string) => `${window.location.origin}/signup?code=${code}`;
+  // the token goes after the #, so it never appears in server logs
+  const resetLink = (token: string) => `${window.location.origin}/reset#${token}`;
   const create = async () => {
     setBusy(true);
     const r = await api<InviteSummary>("/api/invites", { body: {} });
@@ -82,7 +88,6 @@ function Cousins() {
     if (!r.ok) return toast(r.error, "warn");
     setInv(r.data);
     setFresh(r.data.code ?? null);
-    setCopied(false);
   };
   const cancel = async (code: string) => {
     const r = await api<InviteSummary>(`/api/invites?code=${encodeURIComponent(code)}`, { method: "DELETE" });
@@ -91,23 +96,62 @@ function Cousins() {
     if (fresh === code) setFresh(null);
   };
   const copy = async (code: string) => {
-    try { await navigator.clipboard.writeText(link(code)); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { toast("Couldn't copy. Select the link and copy it instead.", "warn"); }
+    try { await navigator.clipboard.writeText(link(code)); toast("Link copied", "info"); } catch { toast("Couldn't copy. Select the link and copy it instead.", "warn"); }
   };
-  const share = async (code: string) => {
-    try { await navigator.share({ title: "Join Thunderstorms 'n' All", text: "Five cousins. Five journeys. One extraordinary life. Here's your invite:", url: link(code) }); } catch { /* dismissed */ }
+  const createReset = async (userId: string) => {
+    setBusy(true);
+    const r = await api<{ token: string; pending: PendingReset[] }>("/api/resets", { body: { userId } });
+    setBusy(false);
+    if (!r.ok) return toast(r.error, "warn");
+    setResets(r.data.pending);
+    setFreshReset({ userId, token: r.data.token });
   };
+  const cancelReset = async (userId: string) => {
+    const r = await api<{ pending: PendingReset[] }>(`/api/resets?userId=${encodeURIComponent(userId)}`, { method: "DELETE" });
+    if (!r.ok) return toast(r.error, "warn");
+    setResets(r.data.pending);
+    if (freshReset?.userId === userId) setFreshReset(null);
+  };
+  const resetFor = freshReset && s.members.find((m) => m.id === freshReset.userId);
 
   return (
     <div id="cousins" className="scroll-mt-20">
     <Section title="Cousins">
       <List>
-        {s.members.map((m) => (
-          <ListRow key={m.id}>
-            <AvatarView member={m} size={36} />
-            <div className="min-w-0 flex-1"><div className="truncate text-[15px] font-medium">{m.name}{m.id === me && <span className="font-normal text-muted-foreground"> (you)</span>}</div><div className="text-[13px] text-muted-foreground">@{m.username}</div></div>
-          </ListRow>
-        ))}
+        {s.members.map((m) => {
+          const pending = resets.find((r) => r.userId === m.id);
+          return (
+            <ListRow key={m.id}>
+              <AvatarView member={m} size={36} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[15px] font-medium">{m.name}{m.id === me && <span className="font-normal text-muted-foreground"> (you)</span>}</div>
+                <div className="truncate text-[13px] text-muted-foreground">@{m.username}</div>
+                {pending && (
+                  <div className="text-[12px] text-muted-foreground">
+                    Reset link until {until(pending.expiresAt)} · <button type="button" className="text-primary hover:opacity-80" onClick={() => cancelReset(m.id)} aria-label={`Cancel ${m.name}'s reset link`}>Cancel</button>
+                  </div>
+                )}
+              </div>
+              {admin && m.id !== me && (
+                <Button size="sm" variant="ghost" className="shrink-0" onClick={() => createReset(m.id)} disabled={busy} aria-label={`Reset ${m.name}'s password`} title="Make a password reset link">
+                  <KeyRound /><span className="hidden sm:inline">Reset password</span>
+                </Button>
+              )}
+            </ListRow>
+          );
+        })}
       </List>
+      {admin && s.members.length > 1 && !resetFor && (
+        <p className="-mt-1 px-1 text-[13px] text-muted-foreground">If a cousin forgets their password, tap the key next to their name to make them a reset link.</p>
+      )}
+      {resetFor && freshReset && (
+        <Card className="p-5 motion-safe:animate-fade-up">
+          <div className="text-[15px] font-medium">Reset link for {resetFor.name}</div>
+          <div className="text-[13px] text-muted-foreground">Send it to {resetFor.name} privately. It works once, for 24 hours, and their current password keeps working until they use it.</div>
+          <SharePanel title="Shown only now, so copy it before you leave" url={resetLink(freshReset.token)} onDone={() => setFreshReset(null)}
+            share={{ title: "Reset your Thunderstorms 'n' All password", text: `${resetFor.name}, here's your link to choose a new password. It works once, for 24 hours.` }} />
+        </Card>
+      )}
       <Card className="p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -117,15 +161,10 @@ function Cousins() {
           {inv && inv.open > 0 && <Button size="sm" onClick={create} disabled={busy}><Plus />Invite</Button>}
         </div>
         {fresh && (
-          <div className="mt-4 rounded-2xl bg-secondary/70 p-4 motion-safe:animate-fade-up">
-            <div className="text-[13px] text-muted-foreground">Send this link to your cousin</div>
-            <div className="mt-1 break-all font-mono text-[14px]">{link(fresh)}</div>
+          <SharePanel title="Send this link to your cousin" url={link(fresh)}
+            share={{ title: "Join Thunderstorms 'n' All", text: "Five cousins. Five journeys. One extraordinary life. Here's your invite:" }}>
             <div className="mt-1 text-[13px] text-muted-foreground">Code: <span className="font-mono tracking-wider text-foreground">{fresh}</span></div>
-            <div className="mt-3 flex gap-2">
-              <Button size="sm" variant="tinted" onClick={() => copy(fresh)}>{copied ? <Check /> : <Copy />}{copied ? "Copied" : "Copy link"}</Button>
-              {typeof navigator !== "undefined" && "share" in navigator && <Button size="sm" variant="secondary" onClick={() => share(fresh)}><Share />Share</Button>}
-            </div>
-          </div>
+          </SharePanel>
         )}
         {inv && inv.invites.filter((i) => i.code !== fresh).length > 0 && (
           <div className="mt-4 divide-y divide-border/70 border-t border-border/70">
@@ -142,6 +181,33 @@ function Cousins() {
         {inv && inv.open === 0 && inv.members < inv.max && <p className="mt-3 text-[13px] text-muted-foreground">Every remaining spot has an invitation waiting.</p>}
       </Card>
     </Section>
+    </div>
+  );
+}
+
+const until = (t: number) => new Date(t).toLocaleString("en-IN", { weekday: "short", hour: "numeric", minute: "2-digit" });
+
+/** A freshly made link, with copy and share buttons. */
+function SharePanel({ title, url, share, onDone, children }: { title: string; url: string; share: { title: string; text: string }; onDone?: () => void; children?: ReactNode }) {
+  const { toast } = useGame();
+  const [copied, setCopied] = useState(false);
+  useEffect(() => setCopied(false), [url]);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { toast("Couldn't copy. Select the link and copy it instead.", "warn"); }
+  };
+  const send = async () => {
+    try { await navigator.share({ ...share, url }); } catch { /* dismissed */ }
+  };
+  return (
+    <div className="mt-4 rounded-2xl bg-secondary/70 p-4 motion-safe:animate-fade-up">
+      <div className="text-[13px] text-muted-foreground">{title}</div>
+      <div className="mt-1 break-all font-mono text-[14px]">{url}</div>
+      {children}
+      <div className="mt-3 flex gap-2">
+        <Button size="sm" variant="tinted" onClick={copy}>{copied ? <Check /> : <Copy />}{copied ? "Copied" : "Copy link"}</Button>
+        {typeof navigator !== "undefined" && "share" in navigator && <Button size="sm" variant="secondary" onClick={send}><Share />Share</Button>}
+        {onDone && <Button size="sm" variant="ghost" className="ml-auto" onClick={onDone}>Done</Button>}
+      </div>
     </div>
   );
 }
@@ -196,7 +262,7 @@ function SquadRules() {
 }
 
 function ChangePassword() {
-  const { toast } = useGame();
+  const { s, profile, toast } = useGame();
   const [f, setF] = useState({ current: "", next: "" });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -220,6 +286,11 @@ function ChangePassword() {
         </div>
         <FormError>{error}</FormError>
         <Button type="submit" variant="secondary" disabled={busy || !f.current || f.next.length < 8}>{busy ? "Saving…" : "Update password"}</Button>
+        <p className="text-[13px] text-muted-foreground">
+          {profile.role === "admin"
+            ? <>Forgot your current one? <Link href="/forgot" className="text-primary hover:opacity-80">Reset it with your setup code</Link>.</>
+            : `Forgot your current one? Ask ${s.members[0]?.name ?? "the organiser"} for a reset link.`}
+        </p>
       </form>
     </Card>
   );

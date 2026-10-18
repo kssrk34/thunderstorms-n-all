@@ -1,6 +1,6 @@
 import { createHash, randomBytes, scrypt, timingSafeEqual, type ScryptOptions } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
-import { readDb, writeDb, type SessionRecord, type UserRecord } from "./db";
+import { readDb, writeDb, type DB, type SessionRecord, type UserRecord } from "./db";
 
 export const SESSION_COOKIE = "tna_session";
 const SESSION_DAYS = 30;
@@ -83,4 +83,42 @@ export async function currentUser(req: NextRequest): Promise<Authed | null> {
     });
   }
   return { user: found.user, sessionId: id, token, refreshed };
+}
+
+/* ---------- forgotten passwords ---------- */
+export const RESET_HOURS = 24;
+
+/** A token for a reset link. Like session tokens, only its hash is stored. */
+export function newResetToken(): { token: string; id: string } {
+  const token = randomBytes(24).toString("base64url");
+  return { token, id: tokenHash(token) };
+}
+
+/** The reset a link's token belongs to, if it is still valid. */
+export function findReset(db: DB, token: string) {
+  if (!token || token.length > 100) return null;
+  const id = tokenHash(token);
+  const reset = db.resets.find((r) => r.id === id && r.expiresAt > Date.now());
+  const user = reset && db.users.find((u) => u.id === reset.userId);
+  return user ? { reset, user } : null;
+}
+
+/**
+ * Sets a new password inside a write. Every session on the account ends, as
+ * does whatever account this device was signed into, any reset links for the
+ * account are used up, and a fresh session starts here.
+ */
+export function replacePassword(db: DB, req: NextRequest, userId: string, passHash: string): string {
+  const here = req.cookies.get(SESSION_COOKIE)?.value;
+  const hereId = here ? tokenHash(here) : "";
+  db.users.find((u) => u.id === userId)!.passHash = passHash;
+  db.sessions = db.sessions.filter((s) => s.userId !== userId && s.id !== hereId);
+  db.resets = db.resets.filter((r) => r.userId !== userId);
+  return startSession(db, userId);
+}
+
+/** Constant-time comparison for secrets such as the setup code. */
+export function sameSecret(a: string, b: string): boolean {
+  const h = (s: string) => createHash("sha256").update(s).digest();
+  return timingSafeEqual(h(a), h(b));
 }

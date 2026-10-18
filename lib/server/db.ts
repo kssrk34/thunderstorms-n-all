@@ -54,14 +54,30 @@ export interface InviteRecord {
   usedAt?: number;
 }
 
+/** A single-use link the organiser makes for a cousin who forgot their password. */
+export interface ResetRecord {
+  /** sha-256 of the token in the link; the raw token is shown to the organiser once and never stored */
+  id: string;
+  userId: string;
+  createdBy: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
 export interface DB {
   schema: number;
   /** bumps on every change cousins can see; clients poll on it */
   rev: number;
-  meta: { createdAt: number; setupCode?: string };
+  meta: {
+    createdAt: number;
+    setupCode?: string;
+    /** wrong setup codes during organiser recovery, counted here so every server instance shares the limit */
+    recovery?: { fails: number; since: number };
+  };
   users: UserRecord[];
   sessions: SessionRecord[];
   invites: InviteRecord[];
+  resets: ResetRecord[];
   game: StoredGame;
 }
 
@@ -198,7 +214,7 @@ const store: Store = g.__tnaStore ?? (g.__tnaStore = { snap: null, inflight: nul
 const newVer = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 function freshDb(): DB {
-  return { schema: LATEST_SCHEMA, rev: 1, meta: { createdAt: Date.now() }, users: [], sessions: [], invites: [], game: toStored(emptyGame()) };
+  return { schema: LATEST_SCHEMA, rev: 1, meta: { createdAt: Date.now() }, users: [], sessions: [], invites: [], resets: [], game: toStored(emptyGame()) };
 }
 
 function announceSetup(db: DB) {
