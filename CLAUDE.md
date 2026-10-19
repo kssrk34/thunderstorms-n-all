@@ -13,9 +13,9 @@ A private life-gamification web app for five cousins (Hyderabad and Bangalore, i
 ## Current state
 
 - `main` is production. **Every push to `main` deploys to Vercel production**; other branches get preview deploys. Vercel deploys through its GitHub integration.
-- Production runs "Add password recovery" (`eca0879`) with **4 real accounts**. Treat production data as real.
-- **Branch `aura-evolution` (local, not pushed as of 2026-10-19)** holds the major evolution described below. It includes **migration 4**, which runs on the first request after deploy (with an automatic pre-migration backup in Redis under `tna:backup:pre-migration-v3-*`).
-- **Preview deploys probably share production's Upstash database** (Vercel connects storage to all environments by default). Opening a preview of this branch would migrate production data while production still runs the old code, which would break the old UI. Deploy by merging to `main`, or first disconnect preview from the production database in Vercel.
+- **Production runs the second-brief evolution** (commit `9fe0ddc`, deployed 2026-10-19 by fast-forwarding `aura-evolution` into `main`; the next commit only adds `docs/Thunderstorms-n-All-Feature-Guide.pdf`, which describes the *previous* version). Migration 4 ran on the first request after deploy; the pre-migration backup is in Redis under `tna:backup:pre-migration-v3-*`. `/api/setup` afterwards still reported `members: 4`.
+- Production has **4 real accounts**. Treat production data as real. Branch `aura-evolution` is merged and can be deleted.
+- Preview deploys probably share production's Upstash database (Vercel connects storage to all environments by default). Before testing anything that migrates data on a preview, disconnect preview from the production database in Vercel.
 - Vercel has `TNA_SETUP_CODE` and Upstash set. WhatsApp, VAPID and `CRON_SECRET` are **not** set, so notifications run as labelled simulations, push is unavailable, and the daily cron returns 503.
 - The fifth cousin hasn't joined yet (one open spot).
 
