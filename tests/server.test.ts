@@ -13,7 +13,7 @@ function user(id: string, name: string, extra: Partial<UserRecord> = {}): UserRe
   return { id, username: name.toLowerCase(), name, passHash: "x", role: id === A ? "admin" : "member", emoji: "⚡", color: "#4C8DFF", onboarded: true, createdAt: Date.now() - 30 * 86_400_000, ...extra };
 }
 function db(): DB {
-  return { schema: 4, rev: 1, meta: { createdAt: 0 }, users: [user(A, "Asha"), user(B, "Bala")], sessions: [], invites: [], resets: [], outbox: [], game: toStored({ ...squad(), members: [] }) };
+  return { schema: 5, rev: 1, meta: { createdAt: 0 }, users: [user(A, "Asha"), user(B, "Bala")], sessions: [], invites: [], resets: [], outbox: [], game: toStored({ ...squad(), members: [] }) };
 }
 function act(d: DB, me: string, ...actions: Action[]) {
   let g = fullGame(d);
@@ -42,7 +42,7 @@ test("migration 4 maps twelve areas onto ten dimensions and keeps every real ite
       badges: {}, levelSeen: {}, notifs: [{ id: "n1", ts: 1, icon: "users", title: "Meetup logged", body: "+30 XP each" }], notifsSeen: {}, selfRatings: {}, restDays: {}, boxOpened: {}, savingsTarget: {},
     },
   };
-  const out = migrate(structuredClone(raw)) as DB & { game: { duels?: unknown } };
+  const out = migrate(structuredClone(raw), 4) as DB & { game: { duels?: unknown } };
   assert.equal(out.schema, 4);
   assert.equal(out.game.habits[0].dim, "intellectual");
   assert.equal(out.game.habits[0].icon, "book");
@@ -128,4 +128,28 @@ test("notifications respect opt-in, dedupe, the daily limit and quiet hours, and
   const [quiet] = enqueue(d, A, msg("e"), lateIST);
   assert.ok(quiet.notBefore > lateIST, "quiet hours hold messages until morning");
   assert.ok(!d.outbox.some((o) => ["sent", "delivered", "read"].includes(o.status)));
+});
+
+test("migration 5 clears everyone's activity and keeps every account intact", () => {
+  const d = db();
+  d.schema = 4;
+  Object.assign(d.users[0], { character: "volt", frame: "charged", bio: "Hi", photo: "data:image/jpeg;base64,AAAA", dailyGoal: 100 as const, notify: { phone: "+919876543210", whatsapp: true, push: false, kinds: { daily: true, overtaken: true, challengeDone: true, ending: true, recap: true }, quietStart: 22, quietEnd: 8, dailyLimit: 3, reminderHour: 9 } });
+  act(d, A,
+    { t: "habitAdd", id: "habit0001", habit: { title: "Run", dim: "health", xp: 20 } },
+    { t: "goalAdd", id: "goal00001", g: { title: "Fit", dim: "health" } },
+    { t: "habit", habitId: "habit0001" },
+  );
+  d.sessions.push({ id: "s", userId: A, createdAt: 1, expiresAt: Date.now() + 1e6, lastSeen: 1 });
+  d.outbox.push({ id: "o", userId: A, kind: "daily", channel: "push", dedupe: "x", createdAt: 1, notBefore: 1, updatedAt: 1, status: "sent", attempts: 1, body: "b" });
+  const users = structuredClone(d.users.map(({ frame: _f, ...u }) => u));
+  const rev = d.rev;
+  const out = migrate(d);
+  assert.equal(out.schema, 5);
+  assert.equal(out.rev, rev + 1);
+  for (const k of ["logs", "habits", "todos", "goals", "challenges", "rivalries", "meetups", "memories", "feed", "notifs"] as const) assert.deepEqual(out.game[k], [], k);
+  assert.deepEqual(out.game.badges, {});
+  assert.deepEqual(out.outbox, []);
+  assert.deepEqual((out.users as UserRecord[]).map(({ frame: _f, ...u }) => u), users, "accounts, passwords, photos, characters and settings are untouched");
+  assert.equal(out.users[0].frame, undefined);
+  assert.equal(out.sessions.length, 1, "nobody is signed out");
 });

@@ -8,7 +8,7 @@ import { addDays, monthStart, today, uid } from "../utils";
  * startup never resets or clears data: only a migration may change stored
  * content, and only in the specific way it describes.
  */
-export const LATEST_SCHEMA = 4;
+export const LATEST_SCHEMA = 5;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Raw = any;
@@ -82,6 +82,19 @@ const MIGRATIONS: Record<number, { name: string; up: (db: Raw) => void }> = {
       db.outbox ??= [];
     },
   },
+  5: {
+    name: "fresh start: clear everyone's activity, keep every account",
+    up(db) {
+      // The owner asked for a clean slate for all cousins. Accounts, passwords, photos, characters,
+      // bios, roles, invitations, sessions and notification settings are untouched; everything the
+      // cousins did in the game is removed. The pre-migration backup keeps a copy of all of it.
+      db.game = toStored(emptyGame());
+      db.outbox = [];
+      for (const u of db.users ?? []) delete u.frame; // frames were unlocked by badges that no longer exist
+      db.rev = (db.rev ?? 0) + 1;
+      console.log(`[thunderstorms] migration 5: cleared game data for ${(db.users ?? []).length} account(s)`);
+    },
+  },
 };
 
 /** Twelve life areas became ten dimensions. Life Vision is now calculated, so items filed under it move to Character. */
@@ -116,8 +129,8 @@ function backfillFeed(g: Raw): Raw[] {
   return out.sort((a, b) => b.ts - a.ts).slice(0, 60);
 }
 
-export function migrate(db: Raw): Raw {
-  for (let v = (db.schema ?? 0) + 1; v <= LATEST_SCHEMA; v++) {
+export function migrate(db: Raw, to = LATEST_SCHEMA): Raw {
+  for (let v = (db.schema ?? 0) + 1; v <= to; v++) {
     console.log(`[thunderstorms] running migration ${v}: ${MIGRATIONS[v].name}`);
     MIGRATIONS[v].up(db);
     db.schema = v;
