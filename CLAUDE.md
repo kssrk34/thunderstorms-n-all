@@ -1,6 +1,6 @@
 # Thunderstorms 'n' All: project handoff
 
-Context for continuing this project in a new session. Read this first, then `README.md` for setup, game rules and hosting. Last updated 2026-10-19.
+Context for continuing this project in a new session. Read this first, then `README.md` for setup, game rules and hosting. Last updated 2026-10-19 (end of the second-brief session).
 
 ## What it is
 
@@ -80,6 +80,7 @@ A private life-gamification web app for five cousins (Hyderabad and Bangalore, i
 - End-to-end testing used `next start` with `TNA_DATA_DIR` pointing at a scratch folder holding a production-shaped schema-3 fixture, plus headless Chrome over the DevTools protocol (`node --experimental-websocket`). In Git Bash, prefix commands that take URL paths with `MSYS_NO_PATHCONV=1`. Radix tabs activate on `mousedown`, so synthetic clicks must send pointer events.
 - Stopping servers on Windows can leave orphaned `node … next` processes; find them with `Get-NetTCPConnection -LocalPort <port>` and check the command line before killing anything (the owner sometimes runs their own `next dev`).
 - Never create test accounts against production.
+- The end-to-end tools (fixture, 43 API checks, screenshot and click scripts) are in `tools/e2e/` with a README.
 
 ## Known limitations and ideas
 
