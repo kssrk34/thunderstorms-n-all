@@ -1,7 +1,6 @@
-import { DEFAULT_PENALTIES } from "./catalog";
 import type { GameState, StoredGame } from "./types";
 
-export const GAME_VERSION = 3;
+export const GAME_VERSION = 4;
 
 /**
  * The starting state for a brand-new squad: no quests, goals, logs or history
@@ -15,24 +14,26 @@ export function emptyGame(): GameState {
     todos: [],
     habits: [],
     challenges: [],
+    rivalries: [],
     meetups: [],
     memories: [],
     goals: [],
+    feed: [],
+    badges: {},
+    levelSeen: {},
+    notifs: [],
+    notifsSeen: {},
+    restDays: {},
+    priorities: {},
     health: {},
     mood: {},
     gratitude: [],
     reviews: [],
     savings: [],
     lessons: {},
-    duels: [],
-    penalties: DEFAULT_PENALTIES.map((p) => ({ ...p })),
-    settings: { penaltiesOn: true, penaltyCap: 20 },
-    badges: {},
-    levelSeen: {},
-    notifs: [],
-    notifsSeen: {},
+    penalties: [],
+    settings: { penaltiesOn: false, penaltyCap: 20 },
     selfRatings: {},
-    restDays: {},
     boxOpened: {},
     savingsTarget: {},
   };

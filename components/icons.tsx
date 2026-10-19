@@ -1,26 +1,43 @@
 import {
-  Award, BatteryCharging, BookOpen, Brain, Briefcase, CalendarCheck, CloudLightning, Compass, Crown, Droplet, Dumbbell,
-  Flag, GraduationCap, Hammer, Heart, HeartHandshake, Home, Leaf, Medal, Moon, Mountain, Palette, PiggyBank, Sparkles, Sprout,
-  Swords, Target, TrendingUp, Trophy, Users, Utensils, Waves, Wind, Zap, type LucideIcon,
+  Activity, Award, BatteryCharging, BookOpen, Brain, Briefcase, CalendarCheck, Clapperboard, CloudLightning, Code2, Coins, Compass, Crown,
+  Droplet, Dumbbell, Flag, Flame, Footprints, Gem, GraduationCap, Hammer, HandHeart, Handshake, Heart, HeartPulse, Home, Leaf, Lightbulb,
+  Medal, Moon, Mountain, Music, Orbit, Palette, PenLine, PiggyBank, Phone, Shield, ShieldCheck, Sparkles, Sprout, Sun, Swords, Target,
+  ThumbsUp, TrendingUp, Trophy, Users, Waves, Wind, Zap, type LucideIcon,
 } from "lucide-react";
-import type { DimId, NotifIcon } from "@/lib/types";
+import type { DimId, NotifIcon, ReactionKind } from "@/lib/types";
 
+/** One line icon per life dimension. */
 export const AREA_ICON: Record<DimId, LucideIcon> = {
-  health: Heart, mind: Brain, emotional: Waves, career: Briefcase, money: PiggyBank, family: Home,
-  friends: Users, creativity: Palette, giving: Sprout, calm: Leaf, adventure: Mountain, vision: Compass,
+  health: HeartPulse, intellectual: Brain, emotional: Waves, character: ShieldCheck, spiritual: Sun,
+  social: Users, financial: Coins, career: Briefcase, quality: Home, vision: Compass,
 };
 
-export const ACTIVITY_ICON: Record<string, LucideIcon> = {
-  exercise: Dumbbell, study: GraduationCap, upskill: Hammer, read: BookOpen, save: PiggyBank, volunteer: HeartHandshake,
-  hobby: Palette, family: Home, calm: Leaf, cook: Utensils, friends: Users, explore: Compass,
+/** Icons a quest can wear (keys in lib/catalog QUEST_ICONS). */
+export const QUEST_ICON: Record<string, LucideIcon> = {
+  bolt: Zap, dumbbell: Dumbbell, run: Activity, walk: Footprints, water: Droplet, sleep: Moon, book: BookOpen, study: GraduationCap,
+  code: Code2, briefcase: Briefcase, brain: Lightbulb, meditate: Leaf, heart: Heart, shield: Shield, users: Users, phone: Phone,
+  coins: PiggyBank, home: Home, palette: Palette, music: Music, mountain: Mountain, sun: Sun, pen: PenLine, sprout: Sprout,
 };
 
 export const BADGE_ICON: Record<string, LucideIcon> = {
-  spark: Sparkles, static: BatteryCharging, rod: Zap, lord: CloudLightning, hydro: Droplet, worm: BookOpen, ninja: Hammer,
-  gym: Dumbbell, scholar: GraduationCap, glue: Users, saver: PiggyBank, reflect: Moon, quest: Flag, goal: Target,
-  honest: Heart, lvl5: Wind, lvl8: Crown, giver: Sprout,
+  spark: Sparkles, aura100: Zap, static: BatteryCharging, rod: CloudLightning, lord: Crown, storm30: Orbit, collab: Handshake,
+  balanced: Compass, quest: Flag, goal: Target, glue: Users, rival: Swords, aura1000: Gem, lvl5: Wind, lvl8: Crown,
+  gym: Dumbbell, worm: BookOpen, ninja: Hammer, scholar: GraduationCap, giver: Sprout,
+  hydro: Droplet, saver: PiggyBank, reflect: Moon, honest: Heart,
 };
 
 export const NOTIF_ICON: Record<NotifIcon, LucideIcon> = {
-  bolt: Zap, trophy: Trophy, level: TrendingUp, badge: Medal, goal: Target, users: Users, rest: CalendarCheck, duel: Swords, quest: Award,
+  bolt: Zap, trophy: Trophy, level: TrendingUp, badge: Medal, goal: Target, users: Users, rest: CalendarCheck, duel: Swords, quest: Award, react: Zap,
+};
+
+export const REACTIONS: { id: ReactionKind; label: string; icon: LucideIcon }[] = [
+  { id: "zap", label: "Charged", icon: Zap },
+  { id: "fire", label: "On fire", icon: Flame },
+  { id: "clap", label: "Respect", icon: ThumbsUp },
+  { id: "heart", label: "Proud of you", icon: HandHeart },
+];
+
+export const FEED_ICON: Record<string, LucideIcon> = {
+  quest: Zap, streak: Flame, challenge: Flag, mission: Handshake, meetup: Users, goal: Target, level: TrendingUp,
+  badge: Medal, daily: Sun, rivalry: Swords, started: Clapperboard,
 };

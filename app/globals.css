@@ -3,56 +3,65 @@
 @tailwind utilities;
 
 /*
- * Thunderstorms 'n' All: calm, Apple-inspired surfaces with a quiet storm
- * personality. Midnight navy, storm grey, cloud white, muted electric blue,
- * and a lightning accent used sparingly for XP and milestones.
+ * Thunderstorms 'n' All: a cinematic storm, refined like Apple hardware.
+ * Deep midnight navy and graphite surfaces; electric blue for action,
+ * lightning violet and cool cyan for energy, warm amber reserved for
+ * achievements. Dark is the default; light mode keeps the same structure.
  */
 @layer base {
   :root {
-    --background: 220 23% 97%;
-    --foreground: 224 40% 10%;
+    --background: 222 30% 97%;
+    --foreground: 226 45% 9%;
     --card: 0 0% 100%;
-    --card-foreground: 224 40% 10%;
+    --card-foreground: 226 45% 9%;
     --popover: 0 0% 100%;
-    --primary: 222 84% 57%;
+    --primary: 218 92% 52%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 18% 94%;
-    --secondary-foreground: 224 40% 10%;
-    --muted: 220 18% 94%;
-    --muted-foreground: 220 9% 44%;
-    --accent: 40 90% 52%;
-    --accent-foreground: 224 40% 10%;
-    --success: 152 52% 38%;
-    --destructive: 0 72% 52%;
+    --secondary: 222 24% 93%;
+    --secondary-foreground: 226 45% 9%;
+    --muted: 222 24% 93%;
+    --muted-foreground: 222 13% 40%;
+    --accent: 36 92% 48%;
+    --accent-foreground: 226 45% 9%;
+    --arc: 262 72% 58%;
+    --ion: 191 88% 38%;
+    --success: 152 58% 36%;
+    --destructive: 0 72% 50%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 14% 90%;
-    --input: 220 14% 88%;
-    --ring: 222 84% 57%;
+    --border: 222 20% 88%;
+    --input: 222 20% 85%;
+    --ring: 218 92% 52%;
     --radius: 1.25rem;
-    --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 6px 20px -12px rgb(16 24 40 / 0.14);
-    --shadow-float: 0 16px 48px -16px rgb(16 24 40 / 0.28);
+    --shadow-card: 0 1px 2px rgb(16 24 40 / 0.05), 0 10px 28px -16px rgb(16 24 40 / 0.18);
+    --shadow-float: 0 22px 60px -20px rgb(16 24 40 / 0.35);
+    --sky-1: 220 60% 88%;
+    --sky-2: 262 50% 92%;
   }
   .dark {
-    --background: 225 45% 6%;
-    --foreground: 220 25% 95%;
-    --card: 224 33% 10%;
-    --card-foreground: 220 25% 95%;
-    --popover: 224 30% 12%;
-    --primary: 221 92% 68%;
-    --primary-foreground: 225 45% 7%;
-    --secondary: 223 24% 15%;
-    --secondary-foreground: 220 25% 95%;
-    --muted: 223 24% 15%;
-    --muted-foreground: 218 14% 62%;
-    --accent: 43 90% 62%;
-    --accent-foreground: 225 45% 7%;
-    --success: 152 46% 52%;
-    --destructive: 0 72% 63%;
-    --border: 223 24% 16%;
-    --input: 223 22% 22%;
-    --ring: 221 92% 68%;
-    --shadow-card: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 12px 32px -18px rgb(0 0 0 / 0.8);
-    --shadow-float: 0 20px 56px -16px rgb(0 0 0 / 0.75);
+    --background: 229 52% 4%;
+    --foreground: 220 38% 94%;
+    --card: 228 44% 7.5%;
+    --card-foreground: 220 38% 94%;
+    --popover: 228 42% 9%;
+    --primary: 216 100% 64%;
+    --primary-foreground: 229 52% 5%;
+    --secondary: 227 32% 12.5%;
+    --secondary-foreground: 220 38% 94%;
+    --muted: 227 32% 12.5%;
+    --muted-foreground: 223 20% 64%;
+    --accent: 40 96% 62%;
+    --accent-foreground: 229 52% 5%;
+    --arc: 263 92% 75%;
+    --ion: 189 96% 62%;
+    --success: 152 62% 52%;
+    --destructive: 0 82% 65%;
+    --border: 226 34% 14.5%;
+    --input: 226 30% 19%;
+    --ring: 216 100% 64%;
+    --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.045), 0 20px 44px -28px rgb(0 0 0 / 0.95);
+    --shadow-float: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 28px 70px -24px rgb(0 0 0 / 0.95);
+    --sky-1: 222 80% 30%;
+    --sky-2: 266 60% 26%;
   }
 
   * { @apply border-border; }
@@ -64,15 +73,15 @@
     font-feature-settings: "cv11", "ss01", "ss03";
     text-rendering: optimizeLegibility;
   }
-  h1, h2, h3 { letter-spacing: -0.022em; }
-  ::selection { background: hsl(var(--primary) / 0.2); }
+  h1, h2, h3 { letter-spacing: -0.025em; }
+  ::selection { background: hsl(var(--primary) / 0.28); }
   :focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; border-radius: 6px; }
   input[type="range"] { accent-color: hsl(var(--primary)); }
 }
 
 @layer components {
   .field {
-    @apply h-11 w-full min-w-0 rounded-xl border border-transparent bg-secondary px-3.5 text-[15px] text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/40 focus:bg-card focus:ring-4 focus:ring-primary/10;
+    @apply h-11 w-full min-w-0 rounded-xl border border-transparent bg-secondary px-3.5 text-[15px] text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/50 focus:bg-card focus:ring-4 focus:ring-primary/15;
   }
   textarea.field { @apply h-auto min-h-[88px] resize-none py-3 leading-relaxed; }
   select.field {
@@ -83,32 +92,75 @@
     background-position: right 0.9rem center;
   }
   .label { @apply mb-1.5 block text-[13px] font-medium text-muted-foreground; }
-  .eyebrow { @apply text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground; }
+  /* condensed, tracked labels: the "HUD" voice */
+  .eyebrow { @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground; }
   .tabular { font-variant-numeric: tabular-nums; }
   /* let grid columns shrink below their content's intrinsic width on phones */
   .grid > * { min-width: 0; }
   .pb-tabbar { padding-bottom: calc(env(safe-area-inset-bottom) + 6.5rem); }
-  /* soft edges on horizontal scrollers */
   .fade-x { mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 28px), transparent); }
   .no-scrollbar { scrollbar-width: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
 
-  /* Atmosphere: soft storm-cloud light for brand moments only */
+  /* A panel lit from above, like brushed metal under storm light */
+  .panel {
+    @apply rounded-[22px] border border-border/80 bg-card text-card-foreground shadow-card;
+    background-image: linear-gradient(180deg, hsl(var(--foreground) / 0.025), transparent 40%);
+  }
+
+  /* Electric border for important achievements: a slow arc of light around the edge */
+  .electric {
+    position: relative;
+    isolation: isolate;
+  }
+  .electric::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: conic-gradient(from var(--angle, 0deg), hsl(var(--primary) / 0.1), hsl(var(--ion)), hsl(var(--arc)), hsl(var(--primary) / 0.1) 40%, hsl(var(--primary) / 0.1));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    z-index: -1;
+    pointer-events: none;
+  }
+  .electric-gold::before {
+    background: conic-gradient(from var(--angle, 0deg), hsl(var(--accent) / 0.12), hsl(var(--accent)), hsl(48 100% 85%), hsl(var(--accent) / 0.12) 40%, hsl(var(--accent) / 0.12));
+  }
+
+  /* Atmosphere for brand moments (auth, onboarding, celebrations) */
   .sky {
     background:
-      radial-gradient(120% 70% at 50% -12%, hsl(221 60% 86% / 0.9), transparent 62%),
-      radial-gradient(55% 45% at 88% 18%, hsl(226 40% 90% / 0.9), transparent 70%),
-      radial-gradient(60% 50% at 6% 34%, hsl(214 30% 90% / 0.8), transparent 70%),
-      linear-gradient(180deg, hsl(220 30% 95%), hsl(220 23% 97%));
+      radial-gradient(110% 70% at 50% -14%, hsl(var(--sky-1) / 0.9), transparent 62%),
+      radial-gradient(60% 50% at 90% 16%, hsl(var(--sky-2) / 0.8), transparent 70%),
+      linear-gradient(180deg, hsl(var(--background)), hsl(var(--background)));
   }
-  .dark .sky, .storm {
+  .storm {
     background:
-      radial-gradient(120% 70% at 50% -12%, hsl(222 55% 20% / 0.95), transparent 62%),
-      radial-gradient(55% 45% at 88% 18%, hsl(228 38% 24% / 0.6), transparent 70%),
-      radial-gradient(60% 50% at 6% 34%, hsl(216 28% 20% / 0.55), transparent 70%),
-      linear-gradient(180deg, hsl(226 48% 9%), hsl(225 45% 5%));
+      radial-gradient(120% 70% at 50% -12%, hsl(222 70% 22% / 0.95), transparent 62%),
+      radial-gradient(55% 45% at 88% 18%, hsl(266 50% 24% / 0.6), transparent 70%),
+      radial-gradient(60% 50% at 6% 34%, hsl(200 50% 18% / 0.5), transparent 70%),
+      linear-gradient(180deg, hsl(228 52% 8%), hsl(229 52% 4%));
   }
+  .glow-text { text-shadow: 0 0 18px hsl(var(--primary) / 0.55); }
 }
+
+@property --angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html:not(.fx-off) .electric::before { animation: electric-spin 5s linear infinite; }
+}
+@keyframes electric-spin { to { --angle: 360deg; } }
+
+/* Decorative effects off (per device) */
+html.fx-off .fx { display: none !important; }
+html.fx-off .fx-anim { animation: none !important; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -117,4 +169,5 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+  .fx { display: none !important; }
 }

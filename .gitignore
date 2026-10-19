@@ -2,6 +2,7 @@ node_modules
 .next
 next-env.d.ts
 *.tsbuildinfo
+.test-build
 
 # user data: accounts, sessions and the game database (never commit)
 /data

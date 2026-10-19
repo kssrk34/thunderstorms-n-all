@@ -10,7 +10,29 @@ export const pad = (n: number) => String(n).padStart(2, "0");
 export function dstr(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
-export const today = () => dstr(new Date());
+
+/**
+ * All five cousins live in India, so the game day runs on India time wherever
+ * the code runs. (Vercel's servers use UTC, which used to file anything done
+ * between midnight and 5:30 am under the previous day.)
+ */
+const GAME_TZ_OFFSET_MIN = 330;
+/** A Date whose UTC fields read as the current wall-clock time in India. */
+export const indiaClock = (ms = Date.now()) => new Date(ms + GAME_TZ_OFFSET_MIN * 60_000);
+export function today(ms = Date.now()): string {
+  const d = indiaClock(ms);
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+/** Hour of the day in India, 0–23. */
+export const indiaHour = (ms = Date.now()) => indiaClock(ms).getUTCHours();
+/** Milliseconds until the given hour (India time) next comes round. */
+export function msUntilIndiaHour(hour: number, ms = Date.now()): number {
+  const d = indiaClock(ms);
+  const target = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hour) - GAME_TZ_OFFSET_MIN * 60_000;
+  return target > ms ? target - ms : target + 86_400_000 - ms;
+}
+/** Monday = 0 … Sunday = 6 */
+export const weekday = (s: string) => (parseD(s).getDay() + 6) % 7;
 
 export function parseD(s: string): Date {
   const [y, m, d] = s.split("-").map(Number);

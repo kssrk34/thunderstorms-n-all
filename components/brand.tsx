@@ -1,16 +1,23 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { motionAllowed } from "@/lib/device";
 import { cn } from "@/lib/utils";
 
 /** Cloud and bolt on a midnight tile. */
 export function LogoMark({ size = 36, className }: { size?: number; className?: string }) {
   return (
     <span
-      className={cn("relative inline-grid shrink-0 place-items-center overflow-hidden rounded-[27%] bg-[linear-gradient(180deg,#27375F,#0B1222)] shadow-sm ring-1 ring-black/5 dark:ring-white/10", className)}
+      className={cn("relative inline-grid shrink-0 place-items-center overflow-hidden rounded-[27%] bg-[linear-gradient(180deg,#22325E,#070B16)] shadow-[0_0_0_1px_rgba(255,255,255,.08),0_8px_24px_-8px_rgba(66,144,255,.55)]", className)}
       style={{ width: size, height: size }}
       aria-hidden
     >
       <svg viewBox="0 0 64 64" width={size} height={size}>
-        <path d="M20.5 37.5h22a8.5 8.5 0 0 0 .9-16.95A11 11 0 0 0 22.3 23 7.3 7.3 0 0 0 20.5 37.5Z" fill="#E9EEF8" />
-        <path d="M34.5 33 28 43.5h5.5L30.5 52 39 40.5h-5.6L36.8 33Z" fill="#F5C451" />
+        <defs>
+          <linearGradient id="tna-bolt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#9FD8FF" /><stop offset="1" stopColor="#4290FF" /></linearGradient>
+        </defs>
+        <path d="M20.5 37.5h22a8.5 8.5 0 0 0 .9-16.95A11 11 0 0 0 22.3 23 7.3 7.3 0 0 0 20.5 37.5Z" fill="#E6EDFA" />
+        <path d="M34.5 33 28 43.5h5.5L30.5 52 39 40.5h-5.6L36.8 33Z" fill="url(#tna-bolt)" />
       </svg>
     </span>
   );
@@ -18,30 +25,89 @@ export function LogoMark({ size = 36, className }: { size?: number; className?: 
 
 export function Wordmark({ className }: { className?: string }) {
   return (
-    <span className={cn("text-[15px] font-semibold tracking-tight", className)}>
+    <span className={cn("font-display text-[15px] font-semibold tracking-tight", className)}>
       Thunderstorms <span className="font-normal text-muted-foreground">&rsquo;n&rsquo; All</span>
     </span>
   );
 }
 
-/** Slow, soft storm clouds for brand moments. Still when reduced motion is on. */
-export function Atmosphere({ className }: { className?: string }) {
+/** The Aura glyph: a bolt inside a spark. */
+export function AuraIcon({ className, glow }: { className?: string; glow?: boolean }) {
   return (
-    <div aria-hidden className={cn("pointer-events-none absolute inset-0 overflow-hidden", className)}>
-      <div className="absolute -left-[12%] top-[6%] h-[42vh] w-[72vw] rounded-full bg-white/60 blur-3xl motion-safe:animate-drift dark:bg-[hsl(222_45%_32%/.32)]" />
-      <div className="absolute -right-[16%] top-[30%] h-[36vh] w-[62vw] rounded-full bg-white/50 blur-3xl motion-safe:animate-drift motion-safe:[animation-delay:-14s] motion-safe:[animation-direction:alternate-reverse] dark:bg-[hsl(228_38%_26%/.32)]" />
-      <div className="absolute bottom-[-10%] left-[20%] h-[30vh] w-[60vw] rounded-full bg-[hsl(221_60%_80%/.35)] blur-3xl dark:bg-[hsl(221_60%_40%/.12)]" />
+    <svg viewBox="0 0 16 16" className={cn("h-3.5 w-3.5 shrink-0", glow && "drop-shadow-[0_0_4px_hsl(var(--primary))]", className)} aria-hidden>
+      <path d="M9.4 1 3.6 9h3.6L6 15l6.4-8.4H8.7L9.4 1Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Loading: the logo with a soft charging ring. */
+export function StormLoader() {
+  return (
+    <div className="grid min-h-dvh place-items-center bg-background">
+      <div className="relative grid place-items-center">
+        <span className="fx absolute h-16 w-16 rounded-full border border-primary/40 motion-safe:animate-ring" style={{ animationIterationCount: "infinite", animationDuration: "1.6s" }} />
+        <LogoMark size={44} className="motion-safe:animate-breathe" />
+        <span className="sr-only">Loading</span>
+      </div>
     </div>
   );
 }
 
-/** One soft flash of light. Used only for real milestones, and never under reduced motion. */
+/**
+ * The storm behind everything: slow clouds and, now and then, a faint flicker
+ * of lightning. Paused when the tab is hidden, and absent when reduced motion
+ * or "decorative effects" is off.
+ */
+export function StormBackdrop() {
+  const [flick, setFlick] = useState(0);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    const schedule = () => {
+      timer.current = setTimeout(() => {
+        if (!document.hidden && motionAllowed()) setFlick((n) => n + 1);
+        schedule();
+      }, 22_000 + Math.random() * 38_000);
+    };
+    schedule();
+    return () => clearTimeout(timer.current);
+  }, []);
+  return (
+    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(90%_55%_at_70%_-10%,hsl(var(--sky-1)/.28),transparent_65%),radial-gradient(70%_50%_at_0%_10%,hsl(var(--sky-2)/.22),transparent_70%)]" />
+      <div className="fx absolute -left-[20%] top-[-8%] h-[46vh] w-[80vw] rounded-full bg-[hsl(var(--sky-1)/.10)] blur-3xl motion-safe:animate-drift fx-anim" />
+      <div className="fx absolute -right-[25%] top-[18%] h-[40vh] w-[70vw] rounded-full bg-[hsl(var(--sky-2)/.10)] blur-3xl motion-safe:animate-drift fx-anim [animation-delay:-25s] [animation-direction:alternate-reverse]" />
+      {flick > 0 && <div key={flick} className="fx absolute inset-0 animate-flicker bg-[radial-gradient(60%_45%_at_75%_0%,hsl(210_100%_85%/.10),transparent_70%)]" />}
+    </div>
+  );
+}
+
+/** One soft flash of light for real milestones. */
 export function LightningFlash() {
-  return <div aria-hidden className="pointer-events-none fixed inset-0 z-[71] bg-[radial-gradient(80%_60%_at_50%_0%,rgba(220,230,255,.9),rgba(220,230,255,0)_70%)] opacity-0 motion-safe:animate-flash" />;
+  return <div aria-hidden className="fx pointer-events-none fixed inset-0 z-[71] bg-[radial-gradient(80%_60%_at_50%_0%,rgba(200,220,255,.85),rgba(200,220,255,0)_70%)] opacity-0 motion-safe:animate-flash" />;
+}
+
+/** Forked bolts that draw themselves across the sky, for level-ups. */
+export function LightningStreaks() {
+  const bolts = [
+    "M140 0 118 70l26 4-34 92 22 2-40 112",
+    "M300 -10l-14 64 20 6-26 70 18 4-22 66",
+    "M40 20l12 50-18 4 16 58-14 6 20 56",
+  ];
+  return (
+    <svg aria-hidden className="fx pointer-events-none absolute inset-x-0 top-0 mx-auto h-[60vh] w-full max-w-lg" viewBox="0 0 340 300" preserveAspectRatio="xMidYMin meet">
+      {bolts.map((d, i) => (
+        // stroke-dashoffset inherits in SVG, so animating the group draws both strokes
+        <g key={i} style={{ animationDelay: `${i * 0.18}s` }} className="opacity-0 motion-safe:animate-bolt-draw">
+          <path d={d} pathLength={1} strokeDasharray="1" fill="none" stroke="hsl(var(--ion))" strokeOpacity=".35" strokeWidth="7" strokeLinejoin="round" />
+          <path d={d} pathLength={1} strokeDasharray="1" fill="none" stroke="#EAF4FF" strokeWidth="1.8" strokeLinejoin="round" />
+        </g>
+      ))}
+    </svg>
+  );
 }
 
 /* ------------------------------------------------------------------ */
-/* Empty-state illustrations: soft, monochrome, a hint of weather      */
+/* Empty-state illustrations: quiet, monochrome, a hint of weather     */
 /* ------------------------------------------------------------------ */
 type Art = { className?: string };
 const Cloud = ({ x = 0, y = 0, s = 1 }: { x?: number; y?: number; s?: number }) => (
@@ -56,8 +122,9 @@ const Cloud = ({ x = 0, y = 0, s = 1 }: { x?: number; y?: number; s?: number }) 
 export function ClearSkyArt({ className }: Art) {
   return (
     <svg viewBox="0 0 120 84" className={cn("h-20 w-auto", className)} aria-hidden>
-      <circle cx="80" cy="30" r="13" className="fill-accent/80" />
-      <g className="fill-foreground opacity-[.09] dark:fill-white dark:opacity-[.13]"><Cloud x={14} y={22} /></g>
+      <circle cx="82" cy="28" r="12" className="fill-primary/70" />
+      <circle cx="82" cy="28" r="20" className="fill-primary/10" />
+      <g className="fill-foreground opacity-[.08] dark:fill-white dark:opacity-[.12]"><Cloud x={14} y={22} /></g>
     </svg>
   );
 }
@@ -65,8 +132,9 @@ export function ClearSkyArt({ className }: Art) {
 export function StormArt({ className }: Art) {
   return (
     <svg viewBox="0 0 120 92" className={cn("h-20 w-auto", className)} aria-hidden>
-      <g className="fill-foreground opacity-[.09] dark:fill-white dark:opacity-[.13]"><Cloud x={18} y={8} /></g>
-      <path d="M62 54 54 68h7l-4 14 13-18h-7l5-10Z" className="fill-accent" />
+      <g className="fill-foreground opacity-[.08] dark:fill-white dark:opacity-[.12]"><Cloud x={18} y={8} /></g>
+      <path d="M62 54 54 68h7l-4 14 13-18h-7l5-10Z" className="fill-primary" />
+      <path d="M62 54 54 68h7l-4 14 13-18h-7l5-10Z" className="fill-none stroke-primary/30" strokeWidth="5" />
     </svg>
   );
 }
@@ -75,7 +143,7 @@ export function SummitArt({ className }: Art) {
   return (
     <svg viewBox="0 0 120 88" className={cn("h-20 w-auto", className)} aria-hidden>
       <g className="fill-foreground opacity-[.07] dark:fill-white dark:opacity-[.1]"><Cloud x={56} y={0} s={0.7} /></g>
-      <path d="M10 80 46 34l14 16 12-14 38 44Z" className="fill-foreground/[.1] dark:fill-white/[.14]" />
+      <path d="M10 80 46 34l14 16 12-14 38 44Z" className="fill-foreground/[.1] dark:fill-white/[.12]" />
       <path d="M46 34V14" className="stroke-foreground/40 dark:stroke-white/50" strokeWidth="2" strokeLinecap="round" />
       <path d="M47 14h15l-4 5 4 5H47Z" className="fill-primary" />
     </svg>
@@ -85,7 +153,7 @@ export function SummitArt({ className }: Art) {
 export function SquadArt({ className }: Art) {
   return (
     <svg viewBox="0 0 120 84" className={cn("h-20 w-auto", className)} aria-hidden>
-      <g className="fill-foreground opacity-[.09] dark:fill-white dark:opacity-[.13]">
+      <g className="fill-foreground opacity-[.08] dark:fill-white dark:opacity-[.12]">
         <circle cx="34" cy="38" r="10" /><path d="M16 74a18 18 0 0 1 36 0Z" />
         <circle cx="86" cy="38" r="10" /><path d="M68 74a18 18 0 0 1 36 0Z" />
       </g>
@@ -94,11 +162,13 @@ export function SquadArt({ className }: Art) {
   );
 }
 
-export function MoonArt({ className }: Art) {
+export function WheelArt({ className }: Art) {
   return (
-    <svg viewBox="0 0 120 84" className={cn("h-20 w-auto", className)} aria-hidden>
-      <path d="M72 16a22 22 0 1 0 16 36 18 18 0 0 1-16-36Z" className="fill-primary/70" />
-      <g className="fill-foreground opacity-[.09] dark:fill-white dark:opacity-[.13]"><Cloud x={4} y={30} s={0.8} /></g>
+    <svg viewBox="0 0 120 88" className={cn("h-20 w-auto", className)} aria-hidden>
+      <circle cx="60" cy="44" r="34" className="fill-none stroke-foreground/10 dark:stroke-white/15" strokeWidth="2" />
+      <circle cx="60" cy="44" r="20" className="fill-none stroke-foreground/10 dark:stroke-white/15" strokeWidth="2" />
+      <path d="M60 10v68M26 44h68M36 20l48 48M84 20 36 68" className="stroke-foreground/10 dark:stroke-white/10" strokeWidth="1.5" />
+      <path d="M60 24 75 36 70 58 52 62 44 42Z" className="fill-primary/25 stroke-primary" strokeWidth="1.5" />
     </svg>
   );
 }

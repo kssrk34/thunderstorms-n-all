@@ -43,7 +43,7 @@ function SignupForm() {
 
   return (
     <AuthFrame
-      step={{ at: 0, of: 4 }}
+      step={{ at: 0, of: 5 }}
       title="Create your account"
       subtitle={inviter ? `${inviter} invited you to the squad.` : setup?.needsSetup ? "You're the first cousin here. Let's set things up." : "Your own private space in the squad."}
       footer={<>Already have an account? <Link href="/login" className="text-primary hover:opacity-80">Sign in</Link></>}

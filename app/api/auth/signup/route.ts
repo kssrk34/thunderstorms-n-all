@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       db.users.push({
         id, username, name, passHash, role, invitedBy,
         emoji: AVATAR_EMOJIS[n % AVATAR_EMOJIS.length], color: MEMBER_COLORS[n % MEMBER_COLORS.length],
-        interests: [], onboarded: false, createdAt: now,
+        onboarded: false, createdAt: now,
       });
       db.rev++;
       return startSession(db, id);

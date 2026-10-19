@@ -2,72 +2,78 @@
 
 import Link from "next/link";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Check, Copy, Download, KeyRound, LogOut, Plus, Share } from "lucide-react";
-import { FormError, PasswordInput } from "@/components/auth";
-import { Field } from "@/components/forms";
-import { AvatarView, DeleteButton, PageHeader, Section } from "@/components/game";
-import { useTheme, type ThemePref } from "@/components/theme";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { List, ListRow } from "@/components/ui/list";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Check, Copy, Download, KeyRound, LogOut, Plus, Share, Smartphone, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { FormError, PasswordInput } from "./auth";
+import { Field } from "./forms";
+import { AvatarView, DeleteButton, Section } from "./game";
+import { useInstallPrompt } from "./runtime";
+import { useTheme, type ThemePref } from "./theme";
+import { Button } from "./ui/button";
+import { Card } from "./ui/card";
+import { List, ListRow } from "./ui/list";
+import { Switch } from "./ui/switch";
+import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
 import { api } from "@/lib/api";
-import { DIMS } from "@/lib/catalog";
+import { useDevicePrefs } from "@/lib/device";
 import { legacyBackup } from "@/lib/legacy";
+import { playZap } from "@/lib/sound";
 import { useGame } from "@/lib/store";
-import type { PenaltyDef } from "@/lib/types";
-import { uid } from "@/lib/utils";
 
 const RULES = [
-  ["Positive first", "Almost all XP comes from doing good things. Slip-ups are optional, small and capped."],
-  ["Habits that stick", "Daily quests are small and repeatable. Streaks reward consistency, and a weekly rest day protects them."],
-  ["A little surprise", "The daily spark adds a small, unpredictable reward."],
-  ["Fair competition", "Whoever is last this week earns 1.25× XP. Savings are ranked by % of your own target, never by amount."],
-  ["Together over against", "Squad challenges and the squad charge mean everyone can win at once."],
-  ["No guilt", "Honest slip-ups earn a bonus, your level never drops, and a daily limit on manual logs prevents burnout."],
+  ["Real actions only", "Aura Points come from completing quests, habits, challenges, logged activities, meetups and goal progress. Nothing is random and nothing is free."],
+  ["Every point is recorded", "Each award is a line in your Aura history with a unique claim, so nothing can be counted twice. Undo removes exactly that line."],
+  ["Life Balance is calculated", "Scores come from what you planned and what you completed. Nobody can type in a score, and very easy tasks can't max out an area."],
+  ["Kind streaks", "A rest day a week keeps your streak safe, and every seven days in a row earns a shield that covers one missed day."],
+  ["Together over against", "Team missions pay out when everyone hits their target. Rivalries are optional and win trophies, not extra Aura."],
+  ["Your data is yours", "Only you can change your quests, goals and profile; the server checks every action. Private quests show cousins the Aura, not the details."],
 ];
 
 interface InviteSummary { members: number; max: number; open: number; invites: { code: string; expiresAt: number; by: string; mine: boolean }[]; code?: string }
 interface PendingReset { userId: string; expiresAt: number }
 
-export default function SettingsPage() {
-  const { profile, signOut } = useGame();
-  return (
-    <div className="space-y-10">
-      <PageHeader title="Settings" />
-      <Appearance />
-      <Cousins />
-      <SquadRules />
-      <Section title="Account">
-        <ChangePassword />
-        <Button variant="ghost" className="text-destructive hover:text-destructive" onClick={signOut}><LogOut />Sign out of {profile.username}</Button>
-      </Section>
-      <YourData />
-      <Section title="How it works">
-        <List>
-          {RULES.map(([t, d]) => <div key={t} className="px-4 py-3.5"><div className="text-[15px] font-medium">{t}</div><p className="text-[14px] text-muted-foreground">{d}</p></div>)}
-        </List>
-      </Section>
-    </div>
-  );
-}
-
-function Appearance() {
+export function Appearance() {
   const { pref, set } = useTheme();
+  const [device, setDevice] = useDevicePrefs();
   return (
-    <Section title="Appearance">
-      <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div><div className="text-[15px] font-medium">Theme</div><div className="text-[13px] text-muted-foreground">Saved on this device.</div></div>
-        <Tabs value={pref} onValueChange={(v) => set(v as ThemePref)}>
-          <TabsList className="flex w-full sm:w-auto"><TabsTrigger value="system">Automatic</TabsTrigger><TabsTrigger value="light">Light</TabsTrigger><TabsTrigger value="dark">Dark</TabsTrigger></TabsList>
-        </Tabs>
-      </Card>
+    <Section title="Appearance and feel">
+      <List>
+        <ListRow className="flex-col items-stretch gap-3 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+          <div><div className="text-[15px] font-medium">Theme</div><div className="text-[13px] text-muted-foreground">Dark is the full storm. Saved on this device.</div></div>
+          <Tabs value={pref} onValueChange={(v) => set(v as ThemePref)}>
+            <TabsList className="flex w-full sm:w-auto"><TabsTrigger value="dark">Dark</TabsTrigger><TabsTrigger value="light">Light</TabsTrigger><TabsTrigger value="system">Automatic</TabsTrigger></TabsList>
+          </Tabs>
+        </ListRow>
+        <ListRow>
+          <Sparkles className="h-5 w-5 shrink-0 text-primary" />
+          <div className="flex-1"><div className="text-[15px]">Storm effects</div><div className="text-[13px] text-muted-foreground">Background lightning, glows and celebrations. Off when your device asks for reduced motion.</div></div>
+          <Switch checked={device.effects} onCheckedChange={(v) => setDevice({ effects: v })} aria-label="Storm effects" />
+        </ListRow>
+        <ListRow>
+          {device.sound ? <Volume2 className="h-5 w-5 shrink-0 text-primary" /> : <VolumeX className="h-5 w-5 shrink-0 text-muted-foreground" />}
+          <div className="flex-1"><div className="text-[15px]">Sound effects</div><div className="text-[13px] text-muted-foreground">A soft zap when Aura Points land.</div></div>
+          <Switch checked={device.sound} onCheckedChange={(v) => { setDevice({ sound: v }); if (v) setTimeout(playZap, 50); }} aria-label="Sound effects" />
+        </ListRow>
+      </List>
     </Section>
   );
 }
 
-function Cousins() {
+export function InstallApp() {
+  const { canPrompt, prompt, installed, ios } = useInstallPrompt();
+  if (installed) return null;
+  return (
+    <Card className="flex items-start gap-4 p-4">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Smartphone className="h-5 w-5" /></span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[15px] font-medium">Install the app</div>
+        <div className="text-[13px] text-muted-foreground">{ios ? "In Safari, tap Share, then “Add to Home Screen”. It opens full screen, like an app." : canPrompt ? "Add Thunderstorms 'n' All to your home screen for one-tap access and notifications." : "Use your browser's menu to install or add to home screen."}</div>
+      </div>
+      {canPrompt && <Button size="sm" onClick={prompt}>Install</Button>}
+    </Card>
+  );
+}
+
+export function Cousins() {
   const { s, me, profile, toast } = useGame();
   const [inv, setInv] = useState<InviteSummary | null>(null);
   const [fresh, setFresh] = useState<string | null>(null);
@@ -115,8 +121,7 @@ function Cousins() {
   const resetFor = freshReset && s.members.find((m) => m.id === freshReset.userId);
 
   return (
-    <div id="cousins" className="scroll-mt-20">
-    <Section title="Cousins">
+    <Section title="Cousins" id="cousins">
       <List>
         {s.members.map((m) => {
           const pending = resets.find((r) => r.userId === m.id);
@@ -141,9 +146,7 @@ function Cousins() {
           );
         })}
       </List>
-      {admin && s.members.length > 1 && !resetFor && (
-        <p className="-mt-1 px-1 text-[13px] text-muted-foreground">If a cousin forgets their password, tap the key next to their name to make them a reset link.</p>
-      )}
+      {admin && s.members.length > 1 && !resetFor && <p className="-mt-1 px-1 text-[13px] text-muted-foreground">If a cousin forgets their password, tap the key next to their name to make them a reset link.</p>}
       {resetFor && freshReset && (
         <Card className="p-5 motion-safe:animate-fade-up">
           <div className="text-[15px] font-medium">Reset link for {resetFor.name}</div>
@@ -161,8 +164,7 @@ function Cousins() {
           {inv && inv.open > 0 && <Button size="sm" onClick={create} disabled={busy}><Plus />Invite</Button>}
         </div>
         {fresh && (
-          <SharePanel title="Send this link to your cousin" url={link(fresh)}
-            share={{ title: "Join Thunderstorms 'n' All", text: "Five cousins. Five journeys. One extraordinary life. Here's your invite:" }}>
+          <SharePanel title="Send this link to your cousin" url={link(fresh)} share={{ title: "Join Thunderstorms 'n' All", text: "Five cousins. Five unique journeys. One shared universe. Here's your invite:" }}>
             <div className="mt-1 text-[13px] text-muted-foreground">Code: <span className="font-mono tracking-wider text-foreground">{fresh}</span></div>
           </SharePanel>
         )}
@@ -172,7 +174,7 @@ function Cousins() {
               <div key={i.code} className="flex items-center gap-3 py-2.5">
                 <span className="font-mono text-[14px] tracking-wider">{i.code}</span>
                 <span className="flex-1 text-[12px] text-muted-foreground">{i.mine ? "" : `from ${i.by} · `}expires {new Date(i.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
-                <Button size="sm" variant="ghost" onClick={() => copy(i.code)}><Copy /></Button>
+                <Button size="sm" variant="ghost" onClick={() => copy(i.code)} aria-label="Copy invite link"><Copy /></Button>
                 {(i.mine || admin) && <DeleteButton onConfirm={() => cancel(i.code)} label="Cancel" />}
               </div>
             ))}
@@ -181,7 +183,6 @@ function Cousins() {
         {inv && inv.open === 0 && inv.members < inv.max && <p className="mt-3 text-[13px] text-muted-foreground">Every remaining spot has an invitation waiting.</p>}
       </Card>
     </Section>
-    </div>
   );
 }
 
@@ -212,57 +213,8 @@ function SharePanel({ title, url, share, onDone, children }: { title: string; ur
   );
 }
 
-function SquadRules() {
-  const { s, profile, act } = useGame();
-  const admin = profile.role === "admin";
-  const organiser = s.members[0];
-  const [cap, setCap] = useState(s.settings.penaltyCap);
-  const [draft, setDraft] = useState({ label: "", xp: 5, dim: DIMS[0].id });
-  useEffect(() => setCap(s.settings.penaltyCap), [s.settings.penaltyCap]);
-  const setDefs = (defs: PenaltyDef[]) => act({ t: "penaltyDefs", defs });
-
-  return (
-    <Section title="Squad rules">
-      <p className="-mt-1 px-1 text-[13px] text-muted-foreground">{admin ? "You're the organiser, so these apply to everyone." : `Set by ${organiser?.name ?? "the organiser"} for the whole squad.`}</p>
-      <List>
-        <ListRow>
-          <div className="flex-1"><div className="text-[15px]">Slip-ups</div><div className="text-[13px] text-muted-foreground">Optional, gentle accountability</div></div>
-          <Switch checked={s.settings.penaltiesOn} disabled={!admin} onCheckedChange={(v) => act({ t: "settings", patch: { penaltiesOn: v } })} aria-label="Slip-ups" />
-        </ListRow>
-        {s.settings.penaltiesOn && (
-          <ListRow className="flex-col items-stretch gap-2 py-3.5">
-            <div className="flex justify-between text-[15px]"><span>Most XP you can lose a day</span><span className="tabular-nums text-muted-foreground">{cap} XP</span></div>
-            <input type="range" min={5} max={50} step={5} value={cap} disabled={!admin} aria-label="Daily slip-up limit"
-              onChange={(e) => setCap(+e.target.value)} onPointerUp={() => cap !== s.settings.penaltyCap && act({ t: "settings", patch: { penaltyCap: cap } })}
-              onKeyUp={() => cap !== s.settings.penaltyCap && act({ t: "settings", patch: { penaltyCap: cap } })} />
-          </ListRow>
-        )}
-      </List>
-      {s.settings.penaltiesOn && (
-        <List>
-          {s.penalties.map((p) => (
-            <ListRow key={p.id}>
-              <Switch checked={p.on} disabled={!admin} onCheckedChange={(v) => setDefs(s.penalties.map((x) => (x.id === p.id ? { ...x, on: v } : x)))} aria-label={p.label} />
-              <span className="min-w-0 flex-1 text-[15px]">{p.label}</span>
-              <span className="text-[13px] tabular-nums text-muted-foreground">−{p.xp}</span>
-              {admin && <DeleteButton onConfirm={() => setDefs(s.penalties.filter((x) => x.id !== p.id))} />}
-            </ListRow>
-          ))}
-          {admin && (
-            <form className="flex gap-2 p-3" onSubmit={(e) => { e.preventDefault(); if (draft.label.trim()) { setDefs([...s.penalties, { ...draft, label: draft.label.trim(), id: uid(), on: true }]); setDraft({ ...draft, label: "" }); } }}>
-              <input className="field" placeholder="Add a slip-up" value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} maxLength={80} />
-              <select className="field w-24 shrink-0" value={draft.xp} onChange={(e) => setDraft({ ...draft, xp: +e.target.value })} aria-label="XP lost">{[3, 5, 8, 10, 15].map((v) => <option key={v} value={v}>−{v}</option>)}</select>
-              <Button type="submit" size="icon" className="h-11 w-11 shrink-0" disabled={!draft.label.trim()} aria-label="Add"><Plus /></Button>
-            </form>
-          )}
-        </List>
-      )}
-    </Section>
-  );
-}
-
-function ChangePassword() {
-  const { s, profile, toast } = useGame();
+export function Account() {
+  const { s, profile, toast, signOut } = useGame();
   const [f, setF] = useState({ current: "", next: "" });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -277,26 +229,29 @@ function ChangePassword() {
     toast("Password changed. Other devices have been signed out.", "info");
   };
   return (
-    <Card className="p-5">
-      <form onSubmit={submit} className="space-y-4">
-        <div className="text-[15px] font-medium">Change password</div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Current password"><PasswordInput value={f.current} onChange={(e) => setF({ ...f, current: e.target.value })} autoComplete="current-password" required /></Field>
-          <Field label="New password"><PasswordInput value={f.next} onChange={(e) => setF({ ...f, next: e.target.value })} autoComplete="new-password" minLength={8} required /></Field>
-        </div>
-        <FormError>{error}</FormError>
-        <Button type="submit" variant="secondary" disabled={busy || !f.current || f.next.length < 8}>{busy ? "Saving…" : "Update password"}</Button>
-        <p className="text-[13px] text-muted-foreground">
-          {profile.role === "admin"
-            ? <>Forgot your current one? <Link href="/forgot" className="text-primary hover:opacity-80">Reset it with your setup code</Link>.</>
-            : `Forgot your current one? Ask ${s.members[0]?.name ?? "the organiser"} for a reset link.`}
-        </p>
-      </form>
-    </Card>
+    <Section title="Account">
+      <Card className="p-5">
+        <form onSubmit={submit} className="space-y-4">
+          <div className="text-[15px] font-medium">Change password</div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Current password"><PasswordInput value={f.current} onChange={(e) => setF({ ...f, current: e.target.value })} autoComplete="current-password" required /></Field>
+            <Field label="New password"><PasswordInput value={f.next} onChange={(e) => setF({ ...f, next: e.target.value })} autoComplete="new-password" minLength={8} required /></Field>
+          </div>
+          <FormError>{error}</FormError>
+          <Button type="submit" variant="secondary" disabled={busy || !f.current || f.next.length < 8}>{busy ? "Saving…" : "Update password"}</Button>
+          <p className="text-[13px] text-muted-foreground">
+            {profile.role === "admin"
+              ? <>Forgot your current one? <Link href="/forgot" className="text-primary hover:opacity-80">Reset it with your setup code</Link>.</>
+              : `Forgot your current one? Ask ${s.members[0]?.name ?? "the organiser"} for a reset link.`}
+          </p>
+        </form>
+      </Card>
+      <Button variant="ghost" className="self-start text-destructive hover:text-destructive" onClick={signOut}><LogOut />Sign out of {profile.username}</Button>
+    </Section>
   );
 }
 
-function YourData() {
+export function YourData() {
   const [legacy, setLegacy] = useState<string | null>(null);
   useEffect(() => setLegacy(legacyBackup()), []);
   const download = () => {
@@ -313,14 +268,24 @@ function YourData() {
       <List>
         <div className="px-4 py-3.5">
           <div className="text-[15px]">Stored on your squad&apos;s server</div>
-          <p className="text-[13px] text-muted-foreground">Your quests, goals and progress belong to your account and sync across your devices. The server keeps a daily backup. Personal things like health, mood, reviews and one-time quests are visible only to you.</p>
+          <p className="text-[13px] text-muted-foreground">Your quests, goals and progress belong to your account and sync across your devices, with a daily backup. Cousins see your profile, Aura totals, achievements and Life Balance scores. Private quests, money amounts, notes and your phone number are only ever sent to you.</p>
         </div>
         {legacy && (
           <ListRow>
-            <div className="min-w-0 flex-1"><div className="text-[15px]">Old demo data on this device</div><div className="text-[13px] text-muted-foreground">The previous version kept sample data in this browser. It was backed up and removed.</div></div>
+            <div className="min-w-0 flex-1"><div className="text-[15px]">Old demo data on this device</div><div className="text-[13px] text-muted-foreground">The first version kept sample data in this browser. It was backed up and removed.</div></div>
             <Button size="sm" variant="secondary" onClick={download}><Download />Download</Button>
           </ListRow>
         )}
+      </List>
+    </Section>
+  );
+}
+
+export function HowItWorks() {
+  return (
+    <Section title="How it works">
+      <List>
+        {RULES.map(([t, d]) => <div key={t} className="px-4 py-3.5"><div className="text-[15px] font-medium">{t}</div><p className="text-[14px] text-muted-foreground">{d}</p></div>)}
       </List>
     </Section>
   );

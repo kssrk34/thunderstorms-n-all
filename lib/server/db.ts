@@ -1,7 +1,7 @@
 import { existsSync, promises as fs } from "fs";
 import path from "path";
 import { emptyGame, toStored } from "../seed";
-import type { StoredGame } from "../types";
+import type { DailyGoal, NotifyPrefs, OutboxItem, StoredGame } from "../types";
 import { today } from "../utils";
 import { LATEST_SCHEMA, migrate } from "./migrations";
 
@@ -29,12 +29,26 @@ export interface UserRecord {
   /** data: URL of an uploaded profile picture */
   photo?: string;
   photoV?: number;
+  /** chosen character portrait; each one belongs to at most one cousin */
+  character?: string;
+  frame?: string;
   bio?: string;
-  interests: string[];
+  /** from an earlier version; kept, no longer shown */
+  interests?: string[];
   onboarded: boolean;
   createdAt: number;
   invitedBy?: string;
+  dailyGoal?: DailyGoal;
+  shareActivity?: boolean;
+  notify?: NotifyPrefs;
+  /** pending phone verification: only a hash of the code is kept */
+  phoneCode?: { hash: string; phone: string; expiresAt: number; tries: number; sentAt: number[] };
+  pushSubs?: PushSub[];
+  /** secret for one-tap unsubscribe links */
+  unsubToken?: string;
 }
+
+export interface PushSub { endpoint: string; keys: { p256dh: string; auth: string }; createdAt: number }
 
 export interface SessionRecord {
   /** sha-256 of the session token; the raw token only ever lives in the cookie */
@@ -73,11 +87,15 @@ export interface DB {
     setupCode?: string;
     /** wrong setup codes during organiser recovery, counted here so every server instance shares the limit */
     recovery?: { fails: number; since: number };
+    /** when scheduled reminders were last checked */
+    lastSchedule?: number;
   };
   users: UserRecord[];
   sessions: SessionRecord[];
   invites: InviteRecord[];
   resets: ResetRecord[];
+  /** messages for WhatsApp and push, with their delivery status */
+  outbox: OutboxItem[];
   game: StoredGame;
 }
 
@@ -214,7 +232,7 @@ const store: Store = g.__tnaStore ?? (g.__tnaStore = { snap: null, inflight: nul
 const newVer = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 function freshDb(): DB {
-  return { schema: LATEST_SCHEMA, rev: 1, meta: { createdAt: Date.now() }, users: [], sessions: [], invites: [], resets: [], game: toStored(emptyGame()) };
+  return { schema: LATEST_SCHEMA, rev: 1, meta: { createdAt: Date.now() }, users: [], sessions: [], invites: [], resets: [], outbox: [], game: toStored(emptyGame()) };
 }
 
 function announceSetup(db: DB) {

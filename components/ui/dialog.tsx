@@ -14,13 +14,13 @@ export const DialogContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, ...props }, ref) => (
   <DialogPrimitive.Portal>
-    <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/25 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 dark:bg-black/55" />
+    <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[3px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 dark:bg-black/65" />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed inset-x-0 bottom-0 z-50 max-h-[92dvh] overflow-y-auto rounded-t-[28px] bg-popover px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 shadow-float outline-none",
+        "fixed inset-x-0 bottom-0 z-50 max-h-[92dvh] overflow-y-auto rounded-t-[28px] border-t border-border bg-popover px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 shadow-float outline-none",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-bottom-8 data-[state=closed]:slide-out-to-bottom-8 data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 duration-300",
-        "sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:w-[calc(100%-2rem)] sm:max-w-[480px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[28px] sm:p-6 sm:data-[state=open]:slide-in-from-bottom-2 sm:data-[state=open]:zoom-in-[.97] sm:data-[state=closed]:zoom-out-[.97]",
+        "sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:w-[calc(100%-2rem)] sm:max-w-[500px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[28px] sm:border sm:p-6 sm:data-[state=open]:slide-in-from-bottom-2 sm:data-[state=open]:zoom-in-[.97] sm:data-[state=closed]:zoom-out-[.97]",
         className,
       )}
       {...props}
@@ -38,7 +38,7 @@ DialogContent.displayName = "DialogContent";
 
 export const DialogHeader = ({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) => <div className={cn("mb-5 space-y-1 pr-10", className)} {...p} />;
 export const DialogTitle = React.forwardRef<React.ElementRef<typeof DialogPrimitive.Title>, React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>>(
-  ({ className, ...p }, ref) => <DialogPrimitive.Title ref={ref} className={cn("text-[22px] font-bold tracking-tight", className)} {...p} />,
+  ({ className, ...p }, ref) => <DialogPrimitive.Title ref={ref} className={cn("font-display text-[22px] font-bold tracking-tight", className)} {...p} />,
 );
 DialogTitle.displayName = "DialogTitle";
 export const DialogDescription = React.forwardRef<React.ElementRef<typeof DialogPrimitive.Description>, React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>>(

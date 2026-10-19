@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#05070E">
+  <title>Offline · Thunderstorms 'n' All</title>
+  <style>
+    html, body { margin: 0; min-height: 100dvh; background: #05070E; color: #E8EEFA; font: 16px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif; }
+    body { display: grid; place-items: center; background: radial-gradient(90% 60% at 50% -10%, rgba(66,144,255,.25), transparent 65%), #05070E; }
+    main { max-width: 24rem; padding: 2rem; text-align: center; }
+    img { width: 64px; height: 64px; border-radius: 27%; }
+    h1 { font-size: 1.5rem; margin: 1.25rem 0 .5rem; letter-spacing: -.02em; }
+    p { color: #9AA6BF; margin: 0 0 1.5rem; }
+    button { font: inherit; font-weight: 600; color: #05070E; background: #4290FF; border: 0; border-radius: 999px; padding: .75rem 1.5rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <main>
+    <img src="/icons/icon-192.png" alt="">
+    <h1>You're offline</h1>
+    <p>Your quests and progress are safe on the server. Reconnect and pick up where you left off.</p>
+    <button onclick="location.reload()">Try again</button>
+  </main>
+</body>
+</html>

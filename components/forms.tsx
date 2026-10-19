@@ -1,22 +1,24 @@
 "use client";
 
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
-import { Camera, Plus, X } from "lucide-react";
+import { Camera, Check, Eye, EyeOff, Lock, Minus, Plus, X } from "lucide-react";
 import {
-  AVATAR_EMOJIS, CHALLENGE_SUGGESTIONS, CHALLENGE_XP, DIM, DIMS, GOAL_SUGGESTIONS, INTERESTS, MEMBER_COLORS, QUEST_EMOJIS, QUEST_SIZES,
+  ACTIVE_DIMS, AURA_LIMITS, CHALLENGE_AURA, CHARACTERS, DIM, EFFORT, GOAL_SUGGESTIONS, MISSION_SUGGESTIONS, PRIVATE_BY_DEFAULT, QUEST_ICONS,
   QUEST_SUGGESTIONS, type QuestKind,
 } from "@/lib/catalog";
-import { newId, useGame, type GoalPreset, type ProfilePatch, type QuestPreset } from "@/lib/store";
-import type { Challenge, DimId } from "@/lib/types";
+import { newId, useGame, type GoalPreset, type QuestPreset } from "@/lib/store";
+import type { ActiveDim, Challenge, Habit } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { AvatarView, SuggestionChip } from "./game";
-import { AREA_ICON } from "./icons";
+import { CharacterArt } from "./avatars";
+import { PhotoCropper } from "./cropper";
+import { AreaTag, AvatarView, QuestGlyph, SuggestionChip } from "./game";
+import { AREA_ICON, QUEST_ICON } from "./icons";
 import { Button } from "./ui/button";
 import { Switch } from "./ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
 
 /* ---------- small building blocks ---------- */
-export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+export function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
   return (
     <label className="block">
       <span className="label">{label}</span>
@@ -26,16 +28,24 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
   );
 }
 
-export function AreaPicker({ value, onChange }: { value: DimId; onChange: (d: DimId) => void }) {
+/** Pick one of the nine dimensions (Life Vision is calculated, so it isn't offered). */
+export function AreaPicker({ value, onChange, exclude, allowNone }: { value?: ActiveDim; onChange: (d: ActiveDim | undefined) => void; exclude?: ActiveDim; allowNone?: boolean }) {
   return (
-    <div className="no-scrollbar fade-x -mx-5 flex gap-2 overflow-x-auto px-5 pb-1 sm:-mx-6 sm:px-6" role="radiogroup" aria-label="Life area">
-      {DIMS.map((d) => {
-        const Icon = AREA_ICON[d.id];
-        const on = value === d.id;
+    <div className="no-scrollbar fade-x -mx-5 flex gap-2 overflow-x-auto px-5 pb-1 sm:-mx-6 sm:px-6" role="radiogroup">
+      {allowNone && (
+        <button type="button" role="radio" aria-checked={!value} onClick={() => onChange(undefined)}
+          className={cn("shrink-0 rounded-full border px-3 py-1.5 text-[13px] transition", !value ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground")}>
+          Just one
+        </button>
+      )}
+      {ACTIVE_DIMS.filter((d) => d !== exclude).map((id) => {
+        const d = DIM[id];
+        const Icon = AREA_ICON[id];
+        const on = value === id;
         return (
-          <button key={d.id} type="button" role="radio" aria-checked={on} onClick={() => onChange(d.id)}
-            className={cn("flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] transition", on ? "border-transparent text-white" : "border-border bg-card text-foreground hover:bg-secondary/60")}
-            style={on ? { background: d.color } : undefined}>
+          <button key={id} type="button" role="radio" aria-checked={on} onClick={() => onChange(id)}
+            className={cn("flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] transition", on ? "border-transparent text-[#05070E]" : "border-border bg-card text-foreground hover:bg-secondary/60")}
+            style={on ? { background: d.color, boxShadow: `0 0 16px ${d.color}66` } : undefined}>
             <Icon className="h-3.5 w-3.5" style={on ? undefined : { color: d.color }} />
             {d.short}
           </button>
@@ -45,94 +55,185 @@ export function AreaPicker({ value, onChange }: { value: DimId; onChange: (d: Di
   );
 }
 
-function EmojiRow({ value, onChange, options }: { value: string; onChange: (e: string) => void; options: string[] }) {
+function IconPicker({ value, onChange, dim }: { value: string; onChange: (i: string) => void; dim: ActiveDim }) {
   return (
-    <div className="no-scrollbar fade-x -mx-5 flex gap-1.5 overflow-x-auto px-5 sm:-mx-6 sm:px-6">
-      {options.map((e) => (
-        <button key={e} type="button" onClick={() => onChange(e)} aria-label={`Icon ${e}`}
-          className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl text-[20px] transition", value === e ? "bg-primary/10 ring-2 ring-primary" : "bg-secondary hover:bg-secondary/70")}>
-          {e}
+    <div className="no-scrollbar fade-x -mx-5 flex gap-1.5 overflow-x-auto px-5 sm:-mx-6 sm:px-6" role="radiogroup" aria-label="Icon">
+      {QUEST_ICONS.map((k) => {
+        const Icon = QUEST_ICON[k];
+        const on = value === k;
+        return (
+          <button key={k} type="button" role="radio" aria-checked={on} onClick={() => onChange(k)} aria-label={k}
+            className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl transition", on ? "ring-2" : "bg-secondary text-muted-foreground hover:text-foreground")}
+            style={on ? { background: `${DIM[dim].color}22`, color: DIM[dim].color, ["--tw-ring-color" as string]: DIM[dim].color } : undefined}>
+            <Icon className="h-[18px] w-[18px]" />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Aura Points by effort, with fine-tuning in steps of 5 inside the allowed range. */
+function EffortPicker({ kind, value, onChange }: { kind: "daily" | "once"; value: number; onChange: (v: number) => void }) {
+  const [min, max] = AURA_LIMITS[kind];
+  return (
+    <div>
+      <div className="grid grid-cols-4 gap-1.5">
+        {EFFORT[kind].map((e) => (
+          <button key={e.label} type="button" onClick={() => onChange(e.xp)} aria-pressed={value === e.xp}
+            className={cn("rounded-xl border px-1 py-2 text-center transition", value === e.xp ? "border-primary bg-primary/10" : "border-border bg-card hover:bg-secondary/50")}>
+            <span className="block text-[13px] font-medium">{e.label}</span>
+            <span className="block text-[11px] tabular-nums text-muted-foreground">{e.xp}</span>
+          </button>
+        ))}
+      </div>
+      <div className="mt-2.5 flex items-center justify-between rounded-xl bg-secondary/60 px-2 py-1.5">
+        <button type="button" aria-label="5 fewer Aura Points" disabled={value <= min} onClick={() => onChange(Math.max(min, value - 5))} className="grid h-8 w-8 place-items-center rounded-full hover:bg-card disabled:opacity-30"><Minus className="h-4 w-4" /></button>
+        <span className="text-[14px]"><span className="font-display text-[18px] font-semibold tabular-nums text-primary">{value}</span> <span className="text-muted-foreground">Aura Points {kind === "daily" ? "each time" : ""}</span></span>
+        <button type="button" aria-label="5 more Aura Points" disabled={value >= max} onClick={() => onChange(Math.min(max, value + 5))} className="grid h-8 w-8 place-items-center rounded-full hover:bg-card disabled:opacity-30"><Plus className="h-4 w-4" /></button>
+      </div>
+    </div>
+  );
+}
+
+const DAY_LETTERS = ["M", "T", "W", "T", "F", "S", "S"];
+const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+function DaysPicker({ value, onChange }: { value?: number[]; onChange: (d?: number[]) => void }) {
+  const on = (d: number) => !value || value.includes(d);
+  const toggle = (d: number) => {
+    const cur = value ?? [0, 1, 2, 3, 4, 5, 6];
+    const next = cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d].sort();
+    onChange(next.length === 0 || next.length === 7 ? undefined : next);
+  };
+  return (
+    <div className="flex gap-1.5" role="group" aria-label="Days of the week">
+      {DAY_LETTERS.map((l, d) => (
+        <button key={d} type="button" onClick={() => toggle(d)} aria-pressed={on(d)} aria-label={DAY_NAMES[d]}
+          className={cn("h-9 flex-1 rounded-full text-[13px] font-medium transition", on(d) ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground")}>
+          {l}
         </button>
       ))}
     </div>
   );
 }
 
+export function VisibilityRow({ value, onChange, what = "quest" }: { value: boolean; onChange: (v: boolean) => void; what?: string }) {
+  return (
+    <label className="flex items-center justify-between gap-3 rounded-2xl bg-secondary/60 px-4 py-3">
+      <span className="flex items-start gap-2.5">
+        {value ? <EyeOff className="mt-0.5 h-4 w-4 text-muted-foreground" /> : <Eye className="mt-0.5 h-4 w-4 text-primary" />}
+        <span>
+          <span className="block text-[14px] font-medium">{value ? "Private" : "Visible to cousins"}</span>
+          <span className="block text-[12px] text-muted-foreground">{value ? `Cousins see the Aura Points, not what this ${what} is.` : `Shows in the squad feed when you complete it.`}</span>
+        </span>
+      </span>
+      <Switch checked={!value} onCheckedChange={(v) => onChange(!v)} aria-label="Visible to cousins" />
+    </label>
+  );
+}
+
 /* ---------- quests ---------- */
 const KIND_COPY: Record<QuestKind, { label: string; placeholder: string; hint: string }> = {
-  daily: { label: "Daily", placeholder: "e.g. Walk for 20 minutes", hint: "Repeats every day. Check it off each time you do it." },
-  once: { label: "One-time", placeholder: "e.g. Sign up for a yoga class", hint: "Do it once, check it off, done." },
-  challenge: { label: "Challenge", placeholder: "e.g. Move every day this week", hint: "A target to reach by a deadline, alone or with cousins." },
+  daily: { label: "Daily", placeholder: "e.g. Morning workout", hint: "Repeats on the days you choose. Check it off each time." },
+  once: { label: "One-time", placeholder: "e.g. Set up a monthly budget", hint: "Do it once, check it off, done." },
+  challenge: { label: "Mission", placeholder: "e.g. Three workouts each this week", hint: "A target with a deadline: solo, or with your cousins." },
 };
+
+type MissionDraft = Pick<Challenge, "period" | "scope" | "track" | "target" | "unit" | "desc" | "participants">;
 
 export function QuestForm({ preset, onDone, allowChallenge = true, submitLabel }: { preset?: QuestPreset; onDone: (kind: QuestKind) => void; allowChallenge?: boolean; submitLabel?: string }) {
   const { s, me, act } = useGame();
-  const [kind, setKind] = useState<QuestKind>(preset?.kind ?? "daily");
-  const [title, setTitle] = useState(preset?.title ?? "");
-  const [dim, setDim] = useState<DimId>(preset?.dim ?? "health");
-  const [emoji, setEmoji] = useState(preset?.emoji ?? "✨");
-  const [xp, setXp] = useState<number>(QUEST_SIZES[1].xp);
-  const [goalId, setGoalId] = useState(preset?.goalId ?? "");
-  const [ch, setCh] = useState<Pick<Challenge, "period" | "scope" | "target" | "unit" | "desc" | "participants">>({ period: "weekly", scope: "solo", target: 7, unit: "days", desc: "", participants: [] });
+  const editing = preset?.edit;
+  const base = editing ? (editing.type === "habit" ? s.habits.find((h) => h.id === editing.id) : s.todos.find((x) => x.id === editing.id)) : undefined;
+  const lockedAura = editing?.type === "todo" && !!(base as { done?: boolean } | undefined)?.done;
+  const [kind, setKind] = useState<QuestKind>(editing ? (editing.type === "habit" ? "daily" : "once") : preset?.kind ?? "daily");
+  const [title, setTitle] = useState(base?.title ?? preset?.title ?? "");
+  const [dim, setDim] = useState<ActiveDim>(base?.dim ?? preset?.dim ?? "health");
+  const [dim2, setDim2] = useState<ActiveDim | undefined>(base?.dim2);
+  const [icon, setIcon] = useState(base?.icon ?? preset?.icon ?? "bolt");
+  const [xp, setXp] = useState<number>(base?.xp ?? preset?.xp ?? 20);
+  const [days, setDays] = useState<number[] | undefined>((base as Habit | undefined)?.days);
+  const [priv, setPriv] = useState<boolean>(base ? !!base.private : PRIVATE_BY_DEFAULT.includes(preset?.dim ?? "health"));
+  const [privTouched, setPrivTouched] = useState(!!base);
+  const [goalId, setGoalId] = useState(base?.goalId ?? preset?.goalId ?? "");
+  const [ch, setCh] = useState<MissionDraft>({ period: "weekly", scope: "team", track: "quests", target: 3, unit: "quests", desc: "", participants: [] });
   const goals = s.goals.filter((g) => g.userId === me && !g.done);
   const others = s.members.filter((m) => m.id !== me);
   const copy = KIND_COPY[kind];
+  const pickDim = (d: ActiveDim) => {
+    setDim(d);
+    if (dim2 === d) setDim2(undefined);
+    if (!privTouched) setPriv(PRIVATE_BY_DEFAULT.includes(d));
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const t = title.trim();
     if (!t) return;
-    const ok = kind === "daily"
-      ? act({ t: "habitAdd", id: newId(), habit: { title: t, emoji, dim, xp, goalId: goalId || undefined } })
-      : kind === "once"
-        ? act({ t: "todoAdd", id: newId(), title: t, emoji, dim, xp, goalId: goalId || undefined })
-        : act({ t: "chCreate", id: newId(), ch: { title: t, emoji, dim, ...ch } });
+    const q = { title: t, icon, dim, dim2, xp, goalId: goalId || undefined, private: priv };
+    let ok: boolean;
+    if (editing?.type === "habit") ok = act({ t: "habitEdit", id: editing.id, habit: { ...q, days } });
+    else if (editing?.type === "todo") ok = act({ t: "todoEdit", id: editing.id, todo: q });
+    else if (kind === "daily") ok = act({ t: "habitAdd", id: newId(), habit: { ...q, days } });
+    else if (kind === "once") ok = act({ t: "todoAdd", id: newId(), todo: q });
+    else ok = act({ t: "chCreate", id: newId(), ch: { title: t, icon, dim, ...ch, scope: ch.participants.length ? ch.scope : "solo", unit: ch.track === "quests" ? ch.unit || "quests" : ch.unit } });
     if (ok) onDone(kind);
   };
 
+  const ideas = kind === "challenge" ? [] : QUEST_SUGGESTIONS.filter((x) => x.kind === kind);
+
   return (
     <form onSubmit={submit} className="space-y-5">
-      <Tabs value={kind} onValueChange={(v) => setKind(v as QuestKind)}>
-        <TabsList className="flex w-full">
-          {(["daily", "once", ...(allowChallenge ? ["challenge" as const] : [])] as QuestKind[]).map((k) => <TabsTrigger key={k} value={k}>{KIND_COPY[k].label}</TabsTrigger>)}
-        </TabsList>
-      </Tabs>
+      {!editing && (
+        <Tabs value={kind} onValueChange={(v) => { setKind(v as QuestKind); if (v === "once" && xp > AURA_LIMITS.once[1]) setXp(20); if (v === "daily" && xp > AURA_LIMITS.daily[1]) setXp(40); }}>
+          <TabsList className="flex w-full">
+            {(["daily", "once", ...(allowChallenge ? ["challenge" as const] : [])] as QuestKind[]).map((k) => <TabsTrigger key={k} value={k}>{KIND_COPY[k].label}</TabsTrigger>)}
+          </TabsList>
+        </Tabs>
+      )}
 
       <div>
-        <input className="field h-12 text-[17px]" autoFocus placeholder={copy.placeholder} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} aria-label="Quest name" />
+        <input className="field h-12 text-[17px]" autoFocus={!editing} placeholder={copy.placeholder} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} aria-label="Name" />
         <p className="mt-1.5 px-1 text-[12px] text-muted-foreground">{copy.hint}</p>
       </div>
 
-      <div>
-        <span className="label">Ideas</span>
-        <div className="flex flex-wrap gap-2">
-          {kind === "challenge"
-            ? CHALLENGE_SUGGESTIONS.map((x) => (
-              <SuggestionChip key={x.title} active={title === x.title} onClick={() => { setTitle(x.title); setDim(x.dim); setEmoji(x.emoji); setCh({ ...ch, period: x.period, scope: x.scope, target: x.target, unit: x.unit, desc: x.desc }); }}>
-                <span aria-hidden>{x.emoji}</span>{x.title}
-              </SuggestionChip>
-            ))
-            : QUEST_SUGGESTIONS.filter((x) => x.kind === kind).map((x) => (
-              <SuggestionChip key={x.title} active={title === x.title} onClick={() => { setTitle(x.title); setDim(x.dim); setEmoji(x.emoji); }}>
-                <span aria-hidden>{x.emoji}</span>{x.title}
-              </SuggestionChip>
-            ))}
+      {!editing && (
+        <div>
+          <span className="label">Ideas</span>
+          <div className="flex flex-wrap gap-2">
+            {kind === "challenge"
+              ? MISSION_SUGGESTIONS.map((x) => (
+                <SuggestionChip key={x.title} active={title === x.title} onClick={() => { setTitle(x.title); setDim(x.dim); setIcon(x.icon); setCh({ ...ch, period: x.period, scope: x.scope, track: x.track, target: x.target, unit: x.unit, desc: x.desc, participants: x.scope === "solo" ? [] : ch.participants.length ? ch.participants : others.map((m) => m.id) }); }}>
+                  {x.title}
+                </SuggestionChip>
+              ))
+              : ideas.map((x) => (
+                <SuggestionChip key={x.title} active={title === x.title} onClick={() => { setTitle(x.title); pickDim(x.dim); setIcon(x.icon); setXp(x.xp); }}>
+                  {x.title}
+                </SuggestionChip>
+              ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div><span className="label">Life area</span><AreaPicker value={dim} onChange={setDim} /></div>
-      <div><span className="label">Icon</span><EmojiRow value={emoji} onChange={setEmoji} options={QUEST_EMOJIS} /></div>
+      <div>
+        <span className="label">Life dimension</span>
+        <AreaPicker value={dim} onChange={(d) => d && pickDim(d)} />
+      </div>
+      {kind !== "challenge" && !lockedAura && (
+        <div>
+          <span className="label">Also counts toward (optional)</span>
+          <AreaPicker value={dim2} onChange={setDim2} exclude={dim} allowNone />
+          {dim2 && <p className="mt-1.5 px-1 text-[12px] text-muted-foreground">Its Aura Points are split evenly: {Math.ceil(xp / 2)} to {DIM[dim].short}, {Math.floor(xp / 2)} to {DIM[dim2].short}.</p>}
+        </div>
+      )}
+      <div><span className="label">Icon</span><IconPicker value={icon} onChange={setIcon} dim={dim} /></div>
 
       {kind !== "challenge" ? (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <span className="label">Size</span>
-            <Tabs value={String(xp)} onValueChange={(v) => setXp(+v)}>
-              <TabsList className="flex w-full">{QUEST_SIZES.map((z) => <TabsTrigger key={z.id} value={String(z.xp)}>{z.label}</TabsTrigger>)}</TabsList>
-            </Tabs>
-            <p className="mt-1.5 px-1 text-[12px] text-muted-foreground">Earns {xp} XP each time</p>
-          </div>
-          {goals.length > 0 && (
+        <div className="space-y-5">
+          {!lockedAura && <div><span className="label">Effort</span><EffortPicker kind={kind} value={xp} onChange={setXp} /></div>}
+          {kind === "daily" && <div><span className="label">Due on</span><DaysPicker value={days} onChange={setDays} /></div>}
+          {goals.length > 0 && !lockedAura && (
             <Field label="Supports a goal">
               <select className="field" value={goalId} onChange={(e) => setGoalId(e.target.value)}>
                 <option value="">None</option>
@@ -140,70 +241,105 @@ export function QuestForm({ preset, onDone, allowChallenge = true, submitLabel }
               </select>
             </Field>
           )}
+          <VisibilityRow value={priv} onChange={(v) => { setPriv(v); setPrivTouched(true); }} />
         </div>
       ) : (
-        <div className="space-y-4">
-          <div>
-            <span className="label">Deadline</span>
-            <Tabs value={ch.period} onValueChange={(v) => setCh({ ...ch, period: v as Challenge["period"] })}>
-              <TabsList className="flex w-full">
-                <TabsTrigger value="daily">Today</TabsTrigger><TabsTrigger value="weekly">This week</TabsTrigger><TabsTrigger value="monthly">30 days</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Target"><input type="number" min={1} inputMode="numeric" className="field" value={ch.target} onChange={(e) => setCh({ ...ch, target: Math.max(1, +e.target.value || 1) })} /></Field>
-            <Field label="Unit"><input className="field" value={ch.unit} maxLength={20} onChange={(e) => setCh({ ...ch, unit: e.target.value })} placeholder="days, pages, km" /></Field>
-          </div>
-          {others.length > 0 && (
-            <div>
-              <span className="label">Invite cousins</span>
-              <div className="flex flex-wrap gap-2">
-                {others.map((m) => {
-                  const on = ch.participants.includes(m.id);
-                  return (
-                    <button key={m.id} type="button" onClick={() => setCh({ ...ch, participants: on ? ch.participants.filter((x) => x !== m.id) : [...ch.participants, m.id] })}
-                      className={cn("flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-[14px] transition", on ? "border-primary bg-primary/10" : "border-border bg-card")}>
-                      <AvatarView member={m} size={26} /> {m.name}
-                    </button>
-                  );
-                })}
-              </div>
-              {ch.participants.length > 0 && (
-                <div className="mt-3">
-                  <Tabs value={ch.scope} onValueChange={(v) => setCh({ ...ch, scope: v as Challenge["scope"] })}>
-                    <TabsList className="flex w-full"><TabsTrigger value="solo">Everyone hits the target</TabsTrigger><TabsTrigger value="squad">One shared target</TabsTrigger></TabsList>
-                  </Tabs>
-                </div>
-              )}
-            </div>
-          )}
-          <p className="px-1 text-[12px] text-muted-foreground">Finishing earns {CHALLENGE_XP[ch.period]} XP{ch.participants.length ? " for each cousin who completes it" : ""}.</p>
-        </div>
+        <MissionFields ch={ch} setCh={setCh} dim={dim} others={others} />
       )}
 
-      <Button type="submit" size="lg" className="w-full" disabled={!title.trim()}>{submitLabel ?? (kind === "challenge" ? "Start challenge" : "Add quest")}</Button>
+      <Button type="submit" size="lg" className="w-full" disabled={!title.trim()}>{submitLabel ?? (editing ? "Save changes" : kind === "challenge" ? "Start mission" : "Add quest")}</Button>
     </form>
   );
 }
 
+function MissionFields({ ch, setCh, dim, others }: { ch: MissionDraft; setCh: (c: MissionDraft) => void; dim: ActiveDim; others: { id: string; name: string; color: string; photo?: string; character?: string; frame?: string }[] }) {
+  const together = ch.participants.length > 0;
+  return (
+    <div className="space-y-5">
+      <div>
+        <span className="label">Deadline</span>
+        <Tabs value={ch.period} onValueChange={(v) => setCh({ ...ch, period: v as Challenge["period"] })}>
+          <TabsList className="flex w-full"><TabsTrigger value="daily">Today</TabsTrigger><TabsTrigger value="weekly">7 days</TabsTrigger><TabsTrigger value="monthly">30 days</TabsTrigger></TabsList>
+        </Tabs>
+      </div>
+      {others.length > 0 && (
+        <div>
+          <span className="label">Invite cousins</span>
+          <div className="flex flex-wrap gap-2">
+            {others.map((m) => {
+              const on = ch.participants.includes(m.id);
+              return (
+                <button key={m.id} type="button" onClick={() => setCh({ ...ch, participants: on ? ch.participants.filter((x) => x !== m.id) : [...ch.participants, m.id] })}
+                  className={cn("flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-[14px] transition", on ? "border-primary bg-primary/10" : "border-border bg-card")}>
+                  <AvatarView member={m} size={26} frame={false} /> {m.name}{on && <Check className="h-3.5 w-3.5 text-primary" />}
+                </button>
+              );
+            })}
+          </div>
+          {together && (
+            <div className="mt-3 grid grid-cols-3 gap-1.5">
+              {([["team", "Team", "Everyone hits their own target"], ["squad", "Shared", "One total, together"], ["solo", "Race", "Each for themselves"]] as const).map(([id, label, sub]) => (
+                <button key={id} type="button" onClick={() => setCh({ ...ch, scope: id })} aria-pressed={ch.scope === id}
+                  className={cn("rounded-xl border px-2 py-2 text-left transition", ch.scope === id ? "border-primary bg-primary/10" : "border-border bg-card")}>
+                  <span className="block text-[13px] font-medium">{label}</span>
+                  <span className="block text-[11px] leading-tight text-muted-foreground">{sub}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <div>
+        <span className="label">How progress counts</span>
+        <div className="grid grid-cols-2 gap-1.5">
+          <button type="button" aria-pressed={ch.track === "quests"} onClick={() => setCh({ ...ch, track: "quests", unit: ch.unit || "quests" })}
+            className={cn("rounded-xl border px-3 py-2.5 text-left transition", ch.track === "quests" ? "border-primary bg-primary/10" : "border-border bg-card")}>
+            <span className="block text-[13px] font-medium">Automatically</span>
+            <span className="block text-[11px] leading-tight text-muted-foreground">Each completed {DIM[dim].short} quest counts</span>
+          </button>
+          <button type="button" aria-pressed={ch.track === "manual"} onClick={() => setCh({ ...ch, track: "manual" })}
+            className={cn("rounded-xl border px-3 py-2.5 text-left transition", ch.track === "manual" ? "border-primary bg-primary/10" : "border-border bg-card")}>
+            <span className="block text-[13px] font-medium">Log it yourself</span>
+            <span className="block text-[11px] leading-tight text-muted-foreground">Pages, km, calls: you add progress</span>
+          </button>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label={ch.scope === "squad" && together ? "Shared target" : "Target each"}><input type="number" min={1} inputMode="numeric" className="field" value={ch.target} onChange={(e) => setCh({ ...ch, target: Math.max(1, +e.target.value || 1) })} /></Field>
+        <Field label="Unit"><input className="field" value={ch.unit} maxLength={20} onChange={(e) => setCh({ ...ch, unit: e.target.value })} placeholder="quests, pages, km" /></Field>
+      </div>
+      <p className="rounded-2xl bg-secondary/60 px-4 py-3 text-[13px] text-muted-foreground">
+        Finishing earns <span className="font-semibold text-primary">{CHALLENGE_AURA[ch.period]} Aura Points</span>
+        {together ? (ch.scope === "team" ? " each, once every cousin reaches the target." : ch.scope === "squad" ? " each, when the total is reached." : " for each cousin who reaches it.") : "."}
+      </p>
+    </div>
+  );
+}
+
 /* ---------- goals ---------- */
-export function GoalForm({ preset, onDone, submitLabel = "Add goal", showSuggestions = true, submitVariant = "default" }: { preset?: GoalPreset; onDone: (id: string) => void; submitLabel?: string; showSuggestions?: boolean; submitVariant?: "default" | "tinted" }) {
-  const { act } = useGame();
-  const [title, setTitle] = useState(preset?.title ?? "");
-  const [dim, setDim] = useState<DimId>(preset?.dim ?? "health");
-  const [why, setWhy] = useState("");
-  const [measurable, setMeasurable] = useState(false);
-  const [target, setTarget] = useState(12);
-  const [unit, setUnit] = useState("");
-  const [due, setDue] = useState("");
+export function GoalForm({ preset, onDone, submitLabel, showSuggestions = true, submitVariant = "default" }: { preset?: GoalPreset; onDone: (id: string) => void; submitLabel?: string; showSuggestions?: boolean; submitVariant?: "default" | "tinted" }) {
+  const { s, me, act } = useGame();
+  const base = preset?.edit ? s.goals.find((g) => g.id === preset.edit && g.userId === me) : undefined;
+  const [title, setTitle] = useState(base?.title ?? preset?.title ?? "");
+  const [dim, setDim] = useState<ActiveDim>(base?.dim ?? preset?.dim ?? "health");
+  const [why, setWhy] = useState(base?.why ?? "");
+  const [measurable, setMeasurable] = useState(!!base?.target);
+  const [target, setTarget] = useState(base?.target ?? 12);
+  const [unit, setUnit] = useState(base?.unit ?? "");
+  const [due, setDue] = useState(base?.due ?? "");
+  const [priv, setPriv] = useState<boolean>(base ? !!base.private : PRIVATE_BY_DEFAULT.includes(preset?.dim ?? "health"));
+  const [privTouched, setPrivTouched] = useState(!!base);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const t = title.trim();
     if (!t) return;
+    if (base) {
+      if (act({ t: "goalEdit", id: base.id, g: { title: t, dim, why: why.trim(), due, private: priv, ...(base.target ? { target, unit: unit.trim() } : {}) } })) onDone(base.id);
+      return;
+    }
     const id = newId();
-    const ok = act({ t: "goalAdd", id, g: { title: t, dim, why: why.trim() || undefined, due: due || undefined, ...(measurable ? { target, unit: unit.trim() || "steps" } : {}) } });
+    const ok = act({ t: "goalAdd", id, g: { title: t, dim, why: why.trim() || undefined, due: due || undefined, private: priv, ...(measurable ? { target, unit: unit.trim() || "steps" } : {}) } });
     if (ok) {
       onDone(id);
       setTitle(""); setWhy(""); setMeasurable(false); setDue(""); setUnit("");
@@ -213,151 +349,132 @@ export function GoalForm({ preset, onDone, submitLabel = "Add goal", showSuggest
   return (
     <form onSubmit={submit} className="space-y-5">
       <input className="field h-12 text-[17px]" placeholder="What would you love to achieve?" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} aria-label="Goal" />
-      {showSuggestions && (
+      {showSuggestions && !base && (
         <div>
           <span className="label">Ideas</span>
           <div className="flex flex-wrap gap-2">
-            {GOAL_SUGGESTIONS.map((g) => <SuggestionChip key={g.title} active={title === g.title} onClick={() => { setTitle(g.title); setDim(g.dim); }}>{g.title}</SuggestionChip>)}
+            {GOAL_SUGGESTIONS.map((g) => <SuggestionChip key={g.title} active={title === g.title} onClick={() => { setTitle(g.title); setDim(g.dim); if (!privTouched) setPriv(PRIVATE_BY_DEFAULT.includes(g.dim)); }}>{g.title}</SuggestionChip>)}
           </div>
         </div>
       )}
-      <div><span className="label">Life area</span><AreaPicker value={dim} onChange={setDim} /></div>
+      <div><span className="label">Life dimension</span><AreaPicker value={dim} onChange={(d) => { if (d) { setDim(d); if (!privTouched) setPriv(PRIVATE_BY_DEFAULT.includes(d)); } }} /></div>
       <Field label="Why it matters (optional)"><input className="field" value={why} onChange={(e) => setWhy(e.target.value)} maxLength={200} placeholder="A sentence future-you will thank you for" /></Field>
 
-      <div className="rounded-2xl bg-secondary/60 p-4">
-        <label className="flex items-center justify-between gap-3">
-          <span>
-            <span className="block text-[15px] font-medium">Track a number</span>
-            <span className="block text-[13px] text-muted-foreground">Like 12 books, 50 km, or ₹50,000</span>
-          </span>
-          <Switch checked={measurable} onCheckedChange={setMeasurable} />
-        </label>
-        {measurable && (
-          <div className="mt-4 grid grid-cols-2 gap-3 motion-safe:animate-fade-up">
-            <Field label="Target"><input type="number" min={1} inputMode="numeric" className="field bg-card" value={target} onChange={(e) => setTarget(Math.max(1, +e.target.value || 1))} /></Field>
-            <Field label="Unit"><input className="field bg-card" value={unit} maxLength={20} onChange={(e) => setUnit(e.target.value)} placeholder="books, km, ₹" /></Field>
-          </div>
-        )}
-      </div>
+      {(!base || base.target) && (
+        <div className="rounded-2xl bg-secondary/60 p-4">
+          {!base && (
+            <label className="flex items-center justify-between gap-3">
+              <span>
+                <span className="block text-[15px] font-medium">Track a number</span>
+                <span className="block text-[13px] text-muted-foreground">Like 12 books, 50 km, or ₹50,000</span>
+              </span>
+              <Switch checked={measurable} onCheckedChange={setMeasurable} />
+            </label>
+          )}
+          {measurable && (
+            <div className={cn("grid grid-cols-2 gap-3 motion-safe:animate-fade-up", !base && "mt-4")}>
+              <Field label="Target"><input type="number" min={1} inputMode="numeric" className="field bg-card" value={target} onChange={(e) => setTarget(Math.max(1, +e.target.value || 1))} /></Field>
+              <Field label="Unit"><input className="field bg-card" value={unit} maxLength={20} onChange={(e) => setUnit(e.target.value)} placeholder="books, km, ₹" /></Field>
+            </div>
+          )}
+          {measurable && unit.trim() === "₹" && <p className="mt-3 text-[12px] text-muted-foreground">Cousins only ever see the percentage, never the amounts.</p>}
+        </div>
+      )}
 
       <Field label="Target date (optional)"><input type="date" className="field" value={due} onChange={(e) => setDue(e.target.value)} /></Field>
-      <Button type="submit" size="lg" variant={submitVariant} className="w-full" disabled={!title.trim()}>{submitLabel}</Button>
+      <VisibilityRow value={priv} onChange={(v) => { setPriv(v); setPrivTouched(true); }} what="goal" />
+      <Button type="submit" size="lg" variant={submitVariant} className="w-full" disabled={!title.trim()}>{submitLabel ?? (base ? "Save changes" : "Add goal")}</Button>
     </form>
   );
 }
 
-/* ---------- profile ---------- */
-async function squarePhoto(file: File, px = 320): Promise<string> {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise<HTMLImageElement>((res, rej) => {
-      const i = new Image();
-      i.onload = () => res(i);
-      i.onerror = rej;
-      i.src = url;
-    });
-    const side = Math.min(img.naturalWidth, img.naturalHeight);
-    const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = px;
-    const ctx = canvas.getContext("2d")!;
-    ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, px, px);
-    return canvas.toDataURL("image/jpeg", 0.86);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-export function ProfileForm({ onSaved, submitLabel = "Save", showName = true }: { onSaved: () => void; submitLabel?: string; showName?: boolean }) {
+/* ---------- identity ---------- */
+export function ProfileForm({ onSaved, submitLabel = "Save" }: { onSaved: () => void; submitLabel?: string }) {
   const { profile, updateProfile, toast } = useGame();
   const [name, setName] = useState(profile.name);
-  const [emoji, setEmoji] = useState(profile.emoji);
-  const [color, setColor] = useState(profile.color);
-  const [photo, setPhoto] = useState<string | null | undefined>(undefined); // undefined = unchanged
   const [bio, setBio] = useState(profile.bio ?? "");
-  const [interests, setInterests] = useState<string[]>(profile.interests);
-  const [custom, setCustom] = useState("");
   const [busy, setBusy] = useState(false);
-  const file = useRef<HTMLInputElement>(null);
-
-  const shownPhoto = photo === undefined ? profile.photo : photo ?? undefined;
-  const toggle = (x: string) => setInterests((l) => (l.includes(x) ? l.filter((y) => y !== x) : l.length >= 12 ? l : [...l, x]));
-  const all = Array.from(new Set([...INTERESTS, ...interests]));
-
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
     setBusy(true);
-    const patch: ProfilePatch = { name: name.trim(), emoji, color, bio: bio.trim(), interests };
-    if (photo !== undefined) patch.photo = photo;
-    const err = await updateProfile(patch);
+    const err = await updateProfile({ name: name.trim(), bio: bio.trim() });
     setBusy(false);
     if (err) toast(err, "warn");
     else onSaved();
   };
-
   return (
-    <form onSubmit={submit} className="space-y-6">
-      <div className="flex flex-col items-center gap-3">
-        <div className="relative">
-          <AvatarView member={{ name, emoji, color, photo: shownPhoto }} size={104} />
-          <button type="button" onClick={() => file.current?.click()} aria-label="Choose a profile photo"
-            className="absolute -bottom-1 -right-1 grid h-9 w-9 place-items-center rounded-full border-[3px] border-popover bg-primary text-primary-foreground shadow-sm transition active:scale-95">
-            <Camera className="h-4 w-4" />
-          </button>
-          <input ref={file} type="file" accept="image/*" className="hidden" onChange={async (e) => {
-            const f = e.target.files?.[0];
-            e.target.value = "";
-            if (!f) return;
-            try { setPhoto(await squarePhoto(f)); } catch { toast("That image couldn't be opened. Try a JPEG or PNG.", "warn"); }
-          }} />
-        </div>
-        {shownPhoto && <button type="button" className="text-[13px] text-muted-foreground hover:text-foreground" onClick={() => setPhoto(null)}>Use an avatar instead</button>}
-      </div>
-
-      {!shownPhoto && (
-        <div className="space-y-3">
-          <span className="label text-center">Or pick an avatar</span>
-          <div className="grid grid-cols-8 gap-1.5">
-            {AVATAR_EMOJIS.map((e) => (
-              <button key={e} type="button" onClick={() => setEmoji(e)} aria-label={`Avatar ${e}`}
-                className={cn("grid aspect-square place-items-center rounded-xl text-[20px] transition", emoji === e ? "bg-primary/10 ring-2 ring-primary" : "bg-secondary hover:bg-secondary/70")}>{e}</button>
-            ))}
-          </div>
-          <div className="flex justify-center gap-2.5">
-            {MEMBER_COLORS.map((c) => (
-              <button key={c} type="button" onClick={() => setColor(c)} aria-label="Colour" className={cn("h-7 w-7 rounded-full transition", color === c ? "ring-2 ring-offset-2 ring-offset-popover" : "opacity-80 hover:opacity-100")} style={{ background: c, ["--tw-ring-color" as string]: c }} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {showName && <Field label="Name"><input className="field" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} required /></Field>}
+    <form onSubmit={submit} className="space-y-5">
+      <Field label="Name"><input className="field" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} required /></Field>
+      <Field label="Username" hint="You sign in with this, so it can't change."><input className="field opacity-70" value={`@${profile.username}`} disabled /></Field>
       <Field label="Short bio (optional)"><textarea className="field min-h-[72px]" value={bio} onChange={(e) => setBio(e.target.value)} maxLength={160} placeholder="Engineer by day, badminton by night." /></Field>
-
-      <div>
-        <span className="label">Interests (optional)</span>
-        <div className="flex flex-wrap gap-2">
-          {all.map((x) => <SuggestionChip key={x} active={interests.includes(x)} onClick={() => toggle(x)}>{x}</SuggestionChip>)}
-        </div>
-        <div className="mt-3 flex gap-2">
-          <input className="field" value={custom} onChange={(e) => setCustom(e.target.value)} maxLength={24} placeholder="Add your own"
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (custom.trim()) { toggle(custom.trim()); setCustom(""); } } }} />
-          <Button type="button" variant="secondary" size="icon" className="h-11 w-11 shrink-0" aria-label="Add interest" disabled={!custom.trim()} onClick={() => { toggle(custom.trim()); setCustom(""); }}><Plus /></Button>
-        </div>
-      </div>
-
       <Button type="submit" size="lg" className="w-full" disabled={busy || !name.trim()}>{busy ? "Saving…" : submitLabel}</Button>
     </form>
   );
 }
 
-/** A compact list of something just added, with an undo-style remove. */
-export function AddedRow({ children, onRemove }: { children: ReactNode; onRemove: () => void }) {
+/**
+ * Choose a character (each belongs to one cousin) or upload a photo, which is
+ * cropped first. Saves straight away.
+ */
+export function AvatarPicker({ compact }: { compact?: boolean }) {
+  const { s, me, profile, updateProfile, toast } = useGame();
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const holder = (id: string) => s.members.find((m) => m.id !== me && m.character === id);
+  const save = async (patch: Parameters<typeof updateProfile>[0], key: string) => {
+    setBusy(key);
+    const err = await updateProfile(patch);
+    setBusy(null);
+    if (err) toast(err, "warn");
+  };
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-secondary/70 px-4 py-3 motion-safe:animate-fade-up">
+    <div className="space-y-5">
+      <div className="flex items-center gap-4">
+        <AvatarView member={profile} size={compact ? 72 : 88} />
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="secondary" onClick={() => input.current?.click()}><Camera />{profile.photo ? "Change photo" : "Upload a photo"}</Button>
+            {profile.photo && <Button type="button" size="sm" variant="ghost" disabled={busy === "photo"} onClick={() => save({ photo: null }, "photo")}><X />Remove photo</Button>}
+          </div>
+          <p className="text-[12px] text-muted-foreground">{profile.photo ? "Your photo shows instead of your character." : "Or pick a character below."}</p>
+        </div>
+        <input ref={input} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) setFile(f); }} />
+      </div>
+      <div className={cn("grid gap-2.5", compact ? "grid-cols-4" : "grid-cols-2 sm:grid-cols-4")}>
+        {CHARACTERS.map((c) => {
+          const taken = holder(c.id);
+          const mine = profile.character === c.id;
+          return (
+            <button key={c.id} type="button" disabled={!!taken || busy !== null} aria-pressed={mine} onClick={() => !mine && save({ character: c.id }, c.id)}
+              className={cn("group relative overflow-hidden rounded-2xl border text-left transition disabled:cursor-not-allowed", mine ? "border-transparent ring-2" : "border-border hover:border-primary/40", taken && "opacity-45")}
+              style={mine ? { ["--tw-ring-color" as string]: c.color, boxShadow: `0 0 24px -6px ${c.color}` } : undefined}>
+              <CharacterArt id={c.id} size={160} className="aspect-square h-auto w-full transition duration-300 group-hover:scale-[1.03]" />
+              <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-2.5 pb-2 pt-6">
+                <span className="block font-display text-[14px] font-semibold text-white">{c.name}</span>
+                {!compact && <span className="block text-[11px] text-white/70">{taken ? `${taken.name}'s character` : c.title}</span>}
+              </span>
+              {mine && <span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full text-[#05070E]" style={{ background: c.color }}><Check className="h-3.5 w-3.5" strokeWidth={3} /></span>}
+              {taken && <span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white"><Lock className="h-3 w-3" /></span>}
+            </button>
+          );
+        })}
+      </div>
+      <PhotoCropper file={file} onCancel={() => setFile(null)} onDone={async (url) => { setFile(null); await save({ photo: url }, "photo"); }} />
+    </div>
+  );
+}
+
+/** A compact list of something just added, with an undo-style remove. */
+export function AddedRow({ children, onRemove, icon, dim }: { children: ReactNode; onRemove: () => void; icon?: string; dim?: ActiveDim }) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl bg-secondary/70 px-3 py-2.5 motion-safe:animate-fade-up">
+      {dim && <QuestGlyph icon={icon} dim={dim} size={30} />}
       <div className="min-w-0 flex-1 text-[15px]">{children}</div>
       <button type="button" onClick={onRemove} className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground hover:bg-card hover:text-foreground" aria-label="Remove"><X className="h-4 w-4" /></button>
     </div>
   );
 }
+
+export { AreaTag };
