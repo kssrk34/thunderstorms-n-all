@@ -14,7 +14,7 @@ function user(id: string, name: string, extra: Partial<UserRecord> = {}): UserRe
   return { id, username: name.toLowerCase(), name, passHash: "x", role: id === A ? "admin" : "member", emoji: "⚡", color: "#4C8DFF", onboarded: true, createdAt: Date.now() - 30 * 86_400_000, ...extra };
 }
 function db(): DB {
-  return { schema: 6, rev: 1, meta: { createdAt: 0 }, users: [user(A, "Asha"), user(B, "Bala")], sessions: [], invites: [], resets: [], outbox: [], game: toStored({ ...squad(), members: [] }) };
+  return { schema: 7, rev: 1, meta: { createdAt: 0 }, users: [user(A, "Asha"), user(B, "Bala")], sessions: [], invites: [], resets: [], outbox: [], game: toStored({ ...squad(), members: [] }) };
 }
 function act(d: DB, me: string, ...actions: Action[]) {
   let g = fullGame(d);

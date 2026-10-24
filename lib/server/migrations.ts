@@ -8,7 +8,7 @@ import { addDays, monthStart, today, uid } from "../utils";
  * startup never resets or clears data: only a migration may change stored
  * content, and only in the specific way it describes.
  */
-export const LATEST_SCHEMA = 6;
+export const LATEST_SCHEMA = 7;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Raw = any;
@@ -126,6 +126,21 @@ const MIGRATIONS: Record<number, { name: string; up: (db: Raw) => void }> = {
         u.notify.kinds = next;
       }
       db.rev = (db.rev ?? 0) + 1;
+    },
+  },
+  7: {
+    name: "second fresh start: clear everyone's activity, keep every profile",
+    up(db) {
+      // The owner asked again (2026-10-24), after testing, to start real use from zero. Same as
+      // migration 5: accounts, passwords, photos, characters, bios, roles, sessions, invitations,
+      // push subscriptions and notification settings stay; quests, habits, goals, missions, shared
+      // quests, rivalries, meetups, history, feed, badges and notifications go. The
+      // pre-migration-v6 backup keeps a copy of all of it.
+      db.game = toStored(emptyGame());
+      db.outbox = [];
+      for (const u of db.users ?? []) delete u.frame; // frames were unlocked by badges that are now cleared
+      db.rev = (db.rev ?? 0) + 1;
+      console.log(`[thunderstorms] migration 7: cleared game data for ${(db.users ?? []).length} account(s)`);
     },
   },
 };

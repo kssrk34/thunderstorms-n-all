@@ -140,7 +140,7 @@ test("cousins who weren't invited never see a shared quest or its moments", () =
   const users = (["Asha", "Bala", "Chitra"] as const).map((name, i): UserRecord => ({
     id: [A, B, C][i], username: name.toLowerCase(), name, passHash: "x", role: i ? "member" : "admin", emoji: "⚡", color: "#4C8DFF", onboarded: true, createdAt: Date.now() - 30 * 86_400_000,
   }));
-  const d: DB = { schema: 6, rev: 1, meta: { createdAt: 0 }, users, sessions: [], invites: [], resets: [], outbox: [], game: toStored({ ...squad(), members: [] }) };
+  const d: DB = { schema: 7, rev: 1, meta: { createdAt: 0 }, users, sessions: [], invites: [], resets: [], outbox: [], game: toStored({ ...squad(), members: [] }) };
   const step = (me: string, a: Action) => {
     const prev = fullGame(d);
     const next = afterAction(d, prev, applyAction(prev, a, me), me);
@@ -177,7 +177,7 @@ test("migration 6 swaps drawn characters for portraits, one per cousin, and carr
     game: { ...toStored(squad()), shares: undefined },
   };
   const before = structuredClone(raw.game);
-  const out = migrate(structuredClone(raw)) as DB;
+  const out = migrate(structuredClone(raw), 6) as DB;
   assert.equal(out.schema, 6);
   const chars = out.users.map((u) => u.character);
   assert.equal(chars[0], "storm-blue");
@@ -191,4 +191,26 @@ test("migration 6 swaps drawn characters for portraits, one per cousin, and carr
   const { shares: _s, ...rest } = out.game;
   const { shares: _b, ...was } = before;
   assert.deepEqual(rest, was, "no game data changes");
+});
+
+test("migration 7 clears everyone's activity again and keeps every profile", () => {
+  let g = shared();
+  g = run(g, B, { t: "shareRespond", id: "share0001", accept: true, copyId: "copyb0001" });
+  g = run(g, A, { t: "habit", habitId: "habit0001" }, { t: "goalAdd", id: "goal00001", g: { title: "Fit", dim: "health" } });
+  const users: UserRecord[] = [A, B].map((id, i) => ({
+    id, username: id, name: id, passHash: "hash", role: i ? "member" : "admin", emoji: "⚡", color: "#4C8DFF", onboarded: true, createdAt: 1,
+    character: i ? "storm-gold" : "storm-blue", photo: i ? "data:image/jpeg;base64,AAAA" : undefined, bio: "Hi", frame: "charged",
+    notify: { whatsapp: false, push: true, kinds: defaultKinds(), quietStart: 22, quietEnd: 8, dailyLimit: 3, reminderHour: 9 },
+    pushSubs: [{ endpoint: "https://push.example/1", keys: { p256dh: "abcdefghij", auth: "abcdefghij" }, createdAt: 1 }],
+  }));
+  const d: DB = { schema: 6, rev: 5, meta: { createdAt: 0 }, users, sessions: [{ id: "s", userId: A, createdAt: 1, expiresAt: Date.now() + 1e6, lastSeen: 1 }], invites: [], resets: [],
+    outbox: [{ id: "o", userId: A, kind: "habits", channel: "push", dedupe: "x", createdAt: 1, notBefore: 1, updatedAt: 1, status: "sent", attempts: 1, body: "b" }], game: toStored(g) };
+  const keep = structuredClone(d.users.map(({ frame: _f, ...u }) => u));
+  const out = migrate(d) as DB;
+  assert.equal(out.schema, 7);
+  for (const k of ["logs", "habits", "todos", "goals", "challenges", "shares", "rivalries", "meetups", "memories", "feed", "notifs"] as const) assert.deepEqual(out.game[k], [], k);
+  assert.deepEqual(out.game.badges, {});
+  assert.deepEqual(out.outbox, []);
+  assert.deepEqual(out.users.map(({ frame: _f, ...u }) => u), keep, "profiles, photos, characters, logins and settings are untouched");
+  assert.equal(out.sessions.length, 1, "nobody is signed out");
 });
