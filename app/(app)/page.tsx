@@ -75,13 +75,18 @@ export default function Dashboard() {
 /* ------------------------------------------------------------------ */
 function SquadStrip() {
   const { s, me } = useGame();
-  const rank = [...s.members].map((m) => ({ id: m.id, a: periodAura(s, m.id, "weekly") })).sort((a, b) => b.a - a.a);
+  // Places only go to cousins who have earned Aura this week; ties share a place and nobody is ranked at 0.
+  const weekly = s.members.map((m) => periodAura(s, m.id, "weekly"));
+  const placeOf = (id: string) => {
+    const i = s.members.findIndex((m) => m.id === id);
+    return weekly[i] > 0 ? 1 + weekly.filter((a) => a > weekly[i]).length : 0;
+  };
   const ordered = [...s.members].sort((a, b) => (a.id === me ? -1 : b.id === me ? 1 : a.joinedAt - b.joinedAt));
   const open = Math.max(0, MAX_MEMBERS - s.members.length);
   return (
     <section aria-label="The squad">
       <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6 lg:mx-0 lg:grid lg:grid-cols-5 lg:overflow-visible lg:px-0">
-        {ordered.map((m) => <CousinCard key={m.id} m={m} place={rank.findIndex((r) => r.id === m.id) + 1} />)}
+        {ordered.map((m) => <CousinCard key={m.id} m={m} place={placeOf(m.id)} />)}
         {Array.from({ length: open }, (_, i) => (
           <Link key={i} href="/profile?tab=settings#cousins" className="panel flex w-[220px] shrink-0 snap-start flex-col items-center justify-center gap-3 border-dashed p-5 text-center text-muted-foreground transition hover:border-primary/40 hover:text-foreground lg:w-auto">
             <span className="grid h-14 w-14 place-items-center rounded-full border border-dashed border-border"><UserPlus className="h-5 w-5" /></span>
