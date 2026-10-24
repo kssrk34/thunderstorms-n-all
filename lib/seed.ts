@@ -14,6 +14,7 @@ export function emptyGame(): GameState {
     todos: [],
     habits: [],
     challenges: [],
+    shares: [],
     rivalries: [],
     meetups: [],
     memories: [],

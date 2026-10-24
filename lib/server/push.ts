@@ -14,7 +14,7 @@ export const pushReady = () => pushConfig() !== null;
 
 export interface PushResult { ok: boolean; gone?: boolean; error?: string; retry?: boolean }
 
-export async function sendPush(sub: PushSub, payload: { title: string; body: string; url?: string; tag?: string }): Promise<PushResult> {
+export async function sendPush(sub: PushSub, payload: { id?: string; title: string; body: string; url?: string; tag?: string }): Promise<PushResult> {
   const cfg = pushConfig();
   if (!cfg) return { ok: false, error: "Push isn't configured on the server." };
   try {

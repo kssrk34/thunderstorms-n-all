@@ -43,7 +43,7 @@ export function habitDone(s: GameState, userId: string, habitId: string, date: s
 
 /** Whether a habit is scheduled on a date (ignoring rest days). */
 export function isDue(h: Habit, date: string): boolean {
-  if (date < h.created || (h.archivedOn && date >= h.archivedOn)) return false;
+  if (date < h.created || (h.archivedOn && date >= h.archivedOn) || (h.endsOn && date > h.endsOn)) return false;
   return !h.days || h.days.length === 0 || h.days.includes(weekday(date));
 }
 

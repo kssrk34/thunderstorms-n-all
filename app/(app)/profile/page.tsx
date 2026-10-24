@@ -36,15 +36,15 @@ function ProfileInner() {
       {!profile.character && !profile.photo && (
         <button onClick={() => setEditing("avatar")} className="electric panel flex w-full items-center gap-3 p-4 text-left">
           <ImageIcon className="h-5 w-5 text-primary" />
-          <span className="flex-1"><span className="block text-[15px] font-semibold">Choose your character</span><span className="block text-[13px] text-muted-foreground">Pick a storm agent or upload a photo. Your cousins will see it everywhere.</span></span>
+          <span className="flex-1"><span className="block text-[15px] font-semibold">Choose your character</span><span className="block text-[13px] text-muted-foreground">Pick one of the five characters or upload a photo. Your cousins will see it everywhere.</span></span>
         </button>
       )}
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="flex w-full sm:inline-flex sm:w-auto">
+        <TabsList className="no-scrollbar flex w-full overflow-x-auto sm:inline-flex sm:w-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="achievements">Badges</TabsTrigger>
           <TabsTrigger value="history">Aura</TabsTrigger>
-          <TabsTrigger value="alerts">Alerts</TabsTrigger>
+          <TabsTrigger value="alerts">Notifications</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="space-y-10">

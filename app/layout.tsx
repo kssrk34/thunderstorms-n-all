@@ -10,13 +10,16 @@ const display = Space_Grotesk({ subsets: ["latin"], variable: "--font-display", 
 
 export const metadata: Metadata = {
   title: { default: "Thunderstorms 'n' All", template: "%s · Thunderstorms 'n' All" },
-  description: "Five cousins. Five unique journeys. One shared universe.",
-  applicationName: "Thunderstorms 'n' All",
-  appleWebApp: { capable: true, title: "Thunderstorms", statusBarStyle: "black-translucent" },
+  description: "Five cousins. One universe. Real progress, real relationships, real Aura.",
+  applicationName: "Project – Thunderstorms ’n’ All",
+  appleWebApp: { capable: true, title: "Thunderstorms", statusBarStyle: "default" },
   icons: { apple: "/icons/apple-touch-icon.png" },
 };
 export const viewport: Viewport = {
-  themeColor: "#05070E",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F4F6FC" },
+    { media: "(prefers-color-scheme: dark)", color: "#05070E" },
+  ],
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -24,7 +27,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`dark ${inter.variable} ${display.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${display.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>

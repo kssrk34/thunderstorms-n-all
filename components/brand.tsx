@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { motionAllowed } from "@/lib/device";
 import { cn } from "@/lib/utils";
 
@@ -169,6 +169,67 @@ export function WheelArt({ className }: Art) {
       <circle cx="60" cy="44" r="20" className="fill-none stroke-foreground/10 dark:stroke-white/15" strokeWidth="2" />
       <path d="M60 10v68M26 44h68M36 20l48 48M84 20 36 68" className="stroke-foreground/10 dark:stroke-white/10" strokeWidth="1.5" />
       <path d="M60 24 75 36 70 58 52 62 44 42Z" className="fill-primary/25 stroke-primary" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Scenery: a restrained storm sky over distant spires                 */
+/* ------------------------------------------------------------------ */
+/** Towers of the far-off citadel: [centre x, height above the ridge, width]. */
+const TOWERS: [number, number, number][] = [
+  [742, 64, 14], [770, 108, 18], [792, 150, 22], [812, 96, 14], [836, 128, 18], [858, 74, 12], [880, 112, 16], [904, 58, 12],
+  [128, 44, 10], [150, 76, 14], [170, 52, 10], [1080, 40, 10], [1102, 66, 12], [1122, 46, 10],
+];
+function citadel(ridge: (x: number) => number) {
+  let d = "";
+  for (const [x, h, w] of TOWERS) {
+    const base = ridge(x) + 4;
+    const top = base - h;
+    const roof = Math.max(10, w * 1.4);
+    d += `M${x - w / 2} ${base}V${top + roof}L${x} ${top}L${x + w / 2} ${top + roof}V${base}Z`;
+  }
+  return d;
+}
+const ridgeFar = (x: number) => 238 - 26 * Math.sin(x / 140) - 14 * Math.sin(x / 47 + 1);
+const ridgeNear = (x: number) => 268 - 18 * Math.sin(x / 110 + 2) - 8 * Math.sin(x / 33);
+const hill = (f: (x: number) => number) => {
+  let d = "M0 300";
+  for (let x = 0; x <= 1200; x += 24) d += `L${x} ${f(x).toFixed(1)}`;
+  return `${d}L1200 300Z`;
+};
+const CLOUDS: [number, number, number, number][] = [[180, 70, 170, 34], [420, 40, 220, 30], [700, 86, 200, 28], [980, 54, 240, 36], [1120, 120, 160, 24], [300, 130, 180, 22]];
+
+/**
+ * A storm sky with distant spires, drawn in the theme's scene colours, for
+ * header bands. Purely decorative; a faint bolt flickers only when motion
+ * is allowed.
+ */
+export function SkyScene({ className }: { className?: string }) {
+  const u = useId().replace(/:/g, "");
+  return (
+    <svg aria-hidden className={cn("pointer-events-none absolute inset-0 h-full w-full", className)} viewBox="0 0 1200 300" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id={`sky-fill${u}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="hsl(var(--scene-top))" />
+          <stop offset=".7" stopColor="hsl(var(--scene-mid))" />
+          <stop offset="1" stopColor="hsl(var(--scene-mid))" />
+        </linearGradient>
+        <radialGradient id={`sky-glow${u}`} cx="68%" cy="78%" r="40%">
+          <stop offset="0" stopColor="hsl(var(--scene-glow))" stopOpacity=".95" />
+          <stop offset="1" stopColor="hsl(var(--scene-glow))" stopOpacity="0" />
+        </radialGradient>
+        <filter id={`sky-soft${u}`} x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="9" /></filter>
+      </defs>
+      <rect width="1200" height="300" fill={`url(#sky-fill${u})`} />
+      <rect width="1200" height="300" fill={`url(#sky-glow${u})`} />
+      <g fill="hsl(var(--scene-cloud))" opacity=".75" filter={`url(#sky-soft${u})`}>
+        {CLOUDS.map(([x, y, rx, ry], i) => <ellipse key={i} cx={x} cy={y} rx={rx} ry={ry} />)}
+      </g>
+      <path d="M836 18 822 52h9l-12 30" fill="none" stroke="hsl(var(--primary))" strokeOpacity=".35" strokeWidth="2" strokeLinejoin="round" className="fx motion-safe:animate-breathe fx-anim" />
+      <path d={hill(ridgeFar)} fill="hsl(var(--scene-far))" />
+      <path d={citadel(ridgeFar)} fill="hsl(var(--scene-far))" />
+      <path d={hill(ridgeNear)} fill="hsl(var(--scene-ridge))" opacity=".85" />
     </svg>
   );
 }

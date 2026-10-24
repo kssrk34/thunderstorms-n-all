@@ -1,9 +1,10 @@
-import { ACTIVE_DIMS, ACTIVITIES, AURA_LIMITS, CHALLENGE_AURA, MEETUP_FULL_AURA, MEETUP_AURA, PRIVATE_ACTIVITIES, PRIVATE_BY_DEFAULT, QUEST_ICONS } from "./catalog";
+import { ACTIVE_DIMS, ACTIVITIES, AURA_LIMITS, CHALLENGE_AURA, MEETUP_FULL_AURA, MEETUP_AURA, PRIVATE_ACTIVITIES, PRIVATE_BY_DEFAULT, QUEST_ICONS, teamBonusFor } from "./catalog";
 import { challengeProgress } from "./balance";
 import { BADGES, auraBetween, ctxFor, dailyPlan, habitStreak, levelOf, lifetimeAura, rivalryWinners, userLogs } from "./engine";
 import { habitRef, ledger } from "./ledger";
-import type { ActiveDim, Challenge, FeedEvent, GameState, Goal, Habit, LogEntry, Meetup, NotifIcon, ReactionKind, Rivalry, Todo } from "./types";
-import { addDays, today, uid, weekStart } from "./utils";
+import { isLive, shareOf, shareProgress } from "./shared";
+import type { ActiveDim, Challenge, FeedEvent, GameState, Goal, Habit, LogEntry, Meetup, Notif, NotifIcon, ReactionKind, Rivalry, SharedQuest, ShareMember, Todo } from "./types";
+import { addDays, daysBetween, fmtShort, today, uid, weekStart } from "./utils";
 
 /**
  * The game rules. Pure and shared: the server runs it as the source of truth,
@@ -21,6 +22,7 @@ const MAX_OPEN_TODOS = 100;
 const MAX_GOALS = 50;
 const MAX_LIVE_CHALLENGES = 20;
 const MAX_LIVE_RIVALRIES = 6;
+const MAX_LIVE_SHARES = 20;
 const FEED_MAX = 300;
 const NOTIFS_MAX = 120;
 export const STREAK_MILESTONES = [3, 5, 7, 14, 21, 30, 50, 75, 100];
@@ -28,7 +30,8 @@ export const STREAK_MILESTONES = [3, 5, 7, 14, 21, 30, 50, 75, 100];
 const ICON_TAG: Record<string, string> = { dumbbell: "workout", run: "workout", walk: "walk", book: "read", study: "study", code: "code", meditate: "calm" };
 
 export interface QuestInput { title: string; icon?: string; dim: ActiveDim; dim2?: ActiveDim; xp: number; goalId?: string; private?: boolean }
-export interface HabitInput extends QuestInput { days?: number[] }
+export interface HabitInput extends QuestInput { days?: number[]; remindAt?: number | null }
+export interface ShareInput { source: { type: "habit" | "todo"; id: string }; mode: SharedQuest["mode"]; endsOn?: string; target?: number; bonus?: boolean; desc?: string; invite: string[] }
 export type ChallengeInput = Pick<Challenge, "title" | "desc" | "period" | "scope" | "track" | "dim" | "target" | "unit" | "participants"> & { icon?: string };
 export interface GoalInput { title: string; dim: ActiveDim; why?: string; target?: number; unit?: string; due?: string; private?: boolean }
 
@@ -62,12 +65,17 @@ export type Action =
   | { t: "goalStep"; id: string; amount: number }
   | { t: "goalToggle"; id: string }
   | { t: "goalDel"; id: string }
+  | { t: "shareCreate"; id?: string } & ShareInput
+  | { t: "shareInvite"; id: string; invite: string[] }
+  | { t: "shareRespond"; id: string; accept: boolean; copyId?: string }
+  | { t: "shareLeave"; id: string }
+  | { t: "shareEnd"; id: string }
   | { t: "notifsRead" };
 
 export const ACTION_TYPES = new Set<Action["t"]>([
   "habit", "habitAdd", "habitEdit", "habitRemove", "todoAdd", "todoEdit", "todo", "todoDel", "activity", "logUndo", "rest", "prioritize",
   "chCreate", "chJoin", "chLeave", "chLog", "chDel", "rivalCreate", "rivalJoin", "rivalLeave", "rivalDel", "meetup", "cheer", "react",
-  "goalAdd", "goalEdit", "goalStep", "goalToggle", "goalDel", "notifsRead",
+  "goalAdd", "goalEdit", "goalStep", "goalToggle", "goalDel", "shareCreate", "shareInvite", "shareRespond", "shareLeave", "shareEnd", "notifsRead",
 ]);
 /** Actions only the organiser may take. None at the moment; the rules are the same for everyone. */
 const ADMIN_ONLY = new Set<Action["t"]>([]);
@@ -137,9 +145,13 @@ function setRef(s: GameState, userId: string, ref: string, on: boolean, l: NewLo
   if (!on && has) return dropRef(s, userId, ref);
   return s;
 }
-const notify = (s: GameState, icon: NotifIcon, title: string, body?: string, to?: string[]): GameState => ({
-  ...s, notifs: [{ id: uid(), ts: Date.now(), icon, title, ...(body ? { body } : {}), ...(to ? { to } : {}) }, ...s.notifs].slice(0, NOTIFS_MAX),
-});
+type NotifExtra = Pick<Notif, "from" | "link" | "kind" | "ref">;
+/** A notification for some cousins. With a `kind`, the server also sends it to their phones if they opted in to that kind. */
+const notify = (s: GameState, icon: NotifIcon, title: string, body?: string, to?: string[], extra: NotifExtra = {}): GameState => {
+  if (to && !to.length) return s;
+  const n = tidy({ id: uid(), ts: Date.now(), icon, title, body, to, ...extra }) as Notif;
+  return { ...s, notifs: [n, ...s.notifs].slice(0, NOTIFS_MAX) };
+};
 function manualCount(s: GameState, userId: string): number {
   const t = today();
   return ledger(s, userId).logs.filter((l) => l.date === t && l.kind === "activity").length;
@@ -149,6 +161,39 @@ const capReached = () => new Nope("You've hit today's logging limit. Rest is par
 const ownGoal = (s: GameState, me: string, id: unknown): Goal | undefined => s.goals.find((g) => g.id === id && g.userId === me);
 const ownHabit = (s: GameState, me: string, id: unknown): Habit | undefined => s.habits.find((h) => h.id === id && h.userId === me);
 const ownTodo = (s: GameState, me: string, id: unknown): Todo | undefined => s.todos.find((x) => x.id === id && x.userId === me);
+
+/* ---------- shared quests ---------- */
+/** The shared quest a copy belongs to, while it's still running. */
+const liveShare = (s: GameState, id: string | undefined, me: string) => {
+  const sq = shareOf(s, id);
+  return sq && isLive(sq) && sq.members[me]?.status === "accepted" ? sq : undefined;
+};
+/** Valid cousins to invite: real members, not yourself, each once. */
+const invitees = (s: GameState, me: string, list: unknown) =>
+  Array.from(new Set((Array.isArray(list) ? list : []).filter((p): p is string => isMember(s, p) && p !== me)));
+export const shareLink = (id: string) => `/quests?tab=shared&q=${id}`;
+const setMember = (s: GameState, id: string, userId: string, m: ShareMember): GameState =>
+  ({ ...s, shares: s.shares.map((x) => (x.id === id ? { ...x, members: { ...x.members, [userId]: tidy({ ...m }) } } : x)) });
+const hourOf = (v: unknown) => (v === null || v === undefined || v === "" ? undefined : int(v, 5, 22));
+const describe = (sq: SharedQuest) =>
+  sq.mode === "team" ? `A team quest: ${sq.target} completions together${sq.endsOn ? ` by ${fmtShort(sq.endsOn)}` : ""}.` : sq.kind === "habit" ? "A shared habit. Everyone keeps their own streak." : "A shared one-time quest.";
+
+/**
+ * Retires a habit: a brand-new, unused one just disappears; anything with
+ * history is archived so its record still counts. Returns the retire date.
+ */
+function retireHabit(s: GameState, me: string, h: Habit, t: string): { s: GameState; on: string } {
+  const L = ledger(s, me);
+  const used = h.created < t || L.logs.some((l) => l.ref?.startsWith(`h:${h.id}:`));
+  const archivedOn = L.refs.has(habitRef(h.id, t)) ? addDays(t, 1) : t;
+  if (!used) return { s: { ...s, habits: s.habits.filter((x) => x.id !== h.id) }, on: archivedOn };
+  return { s: { ...s, habits: s.habits.map((x) => (x.id === h.id ? { ...x, archivedOn } : x)) }, on: archivedOn };
+}
+
+function inviteNotify(s: GameState, sq: SharedQuest, me: string, to: string[]): GameState {
+  return notify(s, "users", `${nameOf(s, me)} invited you to “${sq.title}”`, `${describe(sq)} Want to join?`, to,
+    { from: me, link: shareLink(sq.id), kind: "invites", ref: `share:${sq.id}` });
+}
 
 /** Shared fields of a new or edited quest, sanitised. */
 function questFields(s: GameState, me: string, q: Partial<QuestInput> | undefined, kind: "daily" | "once", base?: Habit | Todo) {
@@ -193,7 +238,7 @@ export function reduce(s: GameState, a: Action, me: string, opts: { admin?: bool
     /* ---------------- daily quests ---------------- */
     case "habit": {
       const h = ownHabit(s, me, a.habitId);
-      if (!h || h.archivedOn) return s;
+      if (!h || h.archivedOn || (h.endsOn && t > h.endsOn)) return s;
       const ref = habitRef(h.id, t);
       const on = !hasRef(s, me, ref);
       const visible = shares(s, me, h.private);
@@ -208,7 +253,7 @@ export function reduce(s: GameState, a: Action, me: string, opts: { admin?: bool
     case "habitAdd": {
       if (repeat(a.id, s.habits, me)) return s;
       if (s.habits.filter((h) => h.userId === me && !h.archivedOn).length >= MAX_HABITS) throw new Nope(`You can have up to ${MAX_HABITS} daily quests. Retire one first.`);
-      const h = tidy({ ...questFields(s, me, a.habit, "daily"), days: daysOf(a.habit?.days), id: newId(a.id, s.habits), userId: me, created: t }) as Habit;
+      const h = tidy({ ...questFields(s, me, a.habit, "daily"), days: daysOf(a.habit?.days), remindAt: hourOf(a.habit?.remindAt), id: newId(a.id, s.habits), userId: me, created: t }) as Habit;
       return { ...s, habits: [...s.habits, h] };
     }
     case "habitEdit": {
@@ -216,18 +261,37 @@ export function reduce(s: GameState, a: Action, me: string, opts: { admin?: bool
       if (!h || h.archivedOn) return s;
       const patch = questFields(s, me, a.habit, "daily", h);
       const days = a.habit && "days" in a.habit ? daysOf(a.habit.days) : h.days;
-      const next = { ...s, habits: s.habits.map((x) => (x.id === h.id ? tidy({ ...x, ...patch, days }) : x)) };
+      const remindAt = a.habit && "remindAt" in a.habit ? hourOf(a.habit.remindAt) : h.remindAt;
+      const sq = liveShare(s, h.shareId, me);
+      let next: GameState;
+      if (sq) {
+        // a shared habit: everyone may change their own reminder, visibility and goal; only the organiser changes the habit itself
+        const mine: Partial<Habit> = { remindAt };
+        if ("private" in patch) mine.private = patch.private;
+        if ("goalId" in patch) mine.goalId = patch.goalId;
+        const template = sq.createdBy === me ? { title: patch.title ?? h.title, icon: patch.icon ?? h.icon, dim: patch.dim ?? h.dim, dim2: "dim2" in patch ? patch.dim2 : h.dim2, xp: patch.xp ?? h.xp, days } : null;
+        const copies = new Set(Object.values(sq.members).filter((m) => m.status === "accepted" && m.copyId).map((m) => m.copyId!));
+        next = {
+          ...s,
+          habits: s.habits.map((x) => {
+            if (x.id === h.id) return tidy({ ...x, ...(template ?? {}), ...mine });
+            if (template && copies.has(x.id) && !x.archivedOn) return tidy({ ...x, ...template });
+            return x;
+          }),
+          shares: template ? s.shares.map((x) => (x.id === sq.id ? tidy({ ...x, ...template }) : x)) : s.shares,
+        };
+      } else {
+        next = { ...s, habits: s.habits.map((x) => (x.id === h.id ? tidy({ ...x, ...patch, days, remindAt }) : x)) };
+      }
       return patch.private !== undefined && !!patch.private !== !!h.private ? revisibility(next, me, `h:${h.id}:`, !!patch.private) : next;
     }
     case "habitRemove": {
       const h = ownHabit(s, me, a.habitId);
       if (!h || h.archivedOn) return s;
-      const L = ledger(s, me);
-      const used = h.created < t || L.logs.some((l) => l.ref?.startsWith(`h:${h.id}:`));
-      // a brand-new, unused quest just disappears; anything with history is retired so its record still counts
-      if (!used) return { ...s, habits: s.habits.filter((x) => x.id !== h.id) };
-      const archivedOn = L.refs.has(habitRef(h.id, t)) ? addDays(t, 1) : t;
-      return { ...s, habits: s.habits.map((x) => (x.id === h.id ? { ...x, archivedOn } : x)) };
+      const sq = liveShare(s, h.shareId, me);
+      // retiring a shared habit: the organiser ends it for everyone (they keep their copies); anyone else leaves it
+      if (sq) return sq.createdBy === me ? reduce(reduce(s, { t: "shareEnd", id: sq.id }, me), a, me) : reduce(s, { t: "shareLeave", id: sq.id }, me);
+      return retireHabit(s, me, h, t).s;
     }
 
     /* ---------------- one-time quests ---------------- */
@@ -244,7 +308,29 @@ export function reduce(s: GameState, a: Action, me: string, opts: { admin?: bool
       // a completed quest's Aura is already in the ledger, so only its name, icon and visibility can change
       const q = td.done ? { title: a.todo?.title, icon: a.todo?.icon, private: a.todo?.private } : a.todo;
       const patch = questFields(s, me, q, "once", td);
-      const next = { ...s, todos: s.todos.map((x) => (x.id === td.id ? { ...tidy({ ...x, ...patch }), done: x.done } : x)) };
+      const sq = liveShare(s, td.shareId, me);
+      let next: GameState;
+      if (sq) {
+        // shared: the organiser changes the quest for everyone (Aura and dimension only where it isn't done yet); others only their visibility and goal
+        const mine: Partial<Todo> = {};
+        if ("private" in patch) mine.private = patch.private;
+        if ("goalId" in patch) mine.goalId = patch.goalId;
+        const own = sq.createdBy === me;
+        const named = own ? { title: patch.title ?? td.title, icon: patch.icon ?? td.icon } : {};
+        const open = own && !td.done ? { dim: patch.dim ?? td.dim, dim2: "dim2" in patch ? patch.dim2 : td.dim2, xp: patch.xp ?? td.xp } : {};
+        const copies = new Set(Object.values(sq.members).filter((m) => m.status === "accepted" && m.copyId).map((m) => m.copyId!));
+        next = {
+          ...s,
+          todos: s.todos.map((x) => {
+            if (x.id === td.id) return { ...tidy({ ...x, ...named, ...open, ...mine }), done: x.done };
+            if (own && copies.has(x.id)) return { ...tidy({ ...x, ...named, ...(x.done ? {} : open) }), done: x.done };
+            return x;
+          }),
+          shares: own ? s.shares.map((x) => (x.id === sq.id ? tidy({ ...x, ...named, ...open }) : x)) : s.shares,
+        };
+      } else {
+        next = { ...s, todos: s.todos.map((x) => (x.id === td.id ? { ...tidy({ ...x, ...patch }), done: x.done } : x)) };
+      }
       return patch.private !== undefined && !!patch.private !== !!td.private ? revisibility(next, me, `todo:${td.id}`, !!patch.private) : next;
     }
     case "todo": {
@@ -264,6 +350,9 @@ export function reduce(s: GameState, a: Action, me: string, opts: { admin?: bool
     case "todoDel": {
       const td = ownTodo(s, me, a.id);
       if (!td) return s;
+      // deleting a shared quest: the organiser ends it for everyone; anyone else leaves it first
+      const sq = liveShare(s, td.shareId, me);
+      if (sq) return reduce(reduce(s, { t: sq.createdBy === me ? "shareEnd" : "shareLeave", id: sq.id }, me), a, me);
       // a finished quest keeps its Aura; an unfinished one never earned any
       return { ...s, todos: s.todos.filter((x) => x.id !== td.id) };
     }
@@ -320,7 +409,7 @@ export function reduce(s: GameState, a: Action, me: string, opts: { admin?: bool
       let next: GameState = { ...s, challenges: [c, ...s.challenges] };
       if (invited.length) {
         next = share(next, { userId: me, kind: "started", text: `started a mission: ${c.title}`, dim: c.dim, ref: `start:${c.id}` });
-        next = notify(next, "quest", `${nameOf(s, me)} invited you to “${c.title}”`, "Open the Arena to see it.", invited);
+        next = notify(next, "quest", `${nameOf(s, me)} invited you to “${c.title}”`, "Open the Arena to see it.", invited, { from: me, link: "/arena?tab=missions", kind: "invites", ref: `ch:${c.id}` });
       }
       return next;
     }
@@ -367,7 +456,7 @@ export function reduce(s: GameState, a: Action, me: string, opts: { admin?: bool
       }) as Rivalry;
       let next: GameState = { ...s, rivalries: [r, ...s.rivalries] };
       next = share(next, { userId: me, kind: "started", text: `started a rivalry: ${r.title}`, ref: `start:${r.id}` });
-      return invited.length ? notify(next, "duel", `${nameOf(s, me)} challenged you: ${r.title}`, r.stake ? `Stakes: ${r.stake}` : "Open the Arena to accept.", invited) : next;
+      return invited.length ? notify(next, "duel", `${nameOf(s, me)} challenged you: ${r.title}`, r.stake ? `Stakes: ${r.stake}` : "Open the Arena to accept.", invited, { from: me, link: "/arena?tab=rivalries", kind: "invites" }) : next;
     }
     case "rivalJoin": {
       const r = s.rivalries.find((x) => x.id === a.id);
@@ -403,7 +492,7 @@ export function reduce(s: GameState, a: Action, me: string, opts: { admin?: bool
       const caption = line(a.memory?.caption, 280);
       if (caption) next = { ...next, memories: [tidy({ id: uid(), meetupId: m.id, date, icon: iconOf(a.memory?.icon) ?? "sun", title: m.place, caption, by: me, cheers: [] as string[] }), ...next.memories] };
       next = share(next, { userId: me, kind: "meetup", text: full ? `got the whole squad together at ${m.place}` : `met up with ${attendees.length - 1} ${attendees.length === 2 ? "cousin" : "cousins"} at ${m.place}`, dim: "social", xp: xpEach, ref: `mt:${m.id}:${me}` });
-      return notify(next, "users", `${nameOf(s, me)} logged a meetup with you`, `${m.place}: +${xpEach} Aura Points each`, attendees.filter((p) => p !== me));
+      return notify(next, "users", `${nameOf(s, me)} logged a meetup with you`, `${m.place}: +${xpEach} Aura Points each`, attendees.filter((p) => p !== me), { from: me, link: "/arena", kind: "meetups" });
     }
     case "cheer": return { ...s, memories: s.memories.map((m) => (m.id === a.id ? { ...m, cheers: m.cheers.includes(me) ? m.cheers.filter((x) => x !== me) : [...m.cheers, me] } : m)) };
     case "react": {
@@ -413,7 +502,7 @@ export function reduce(s: GameState, a: Action, me: string, opts: { admin?: bool
       const { [me]: prev, ...others } = ev.reactions;
       const reactions = kind ? { ...others, [me]: kind } : others;
       const next = { ...s, feed: s.feed.map((e) => (e.id === ev.id ? { ...e, reactions } : e)) };
-      return kind && !prev ? notify(next, "react", `${nameOf(s, me)} reacted to your update`, `“${ev.text}”`, [ev.userId]) : next;
+      return kind && !prev ? notify(next, "react", `${nameOf(s, me)} reacted to your update`, `“${ev.text}”`, [ev.userId], { from: me, link: "/" }) : next;
     }
 
     /* ---------------- goals ---------------- */
@@ -480,6 +569,107 @@ export function reduce(s: GameState, a: Action, me: string, opts: { admin?: bool
       return { ...s, goals: s.goals.filter((x) => x.id !== g.id), habits: s.habits.map(unlink), todos: s.todos.map(unlink) };
     }
 
+    /* ---------------- shared quests and habits ---------------- */
+    case "shareCreate": {
+      if (validId(a.id) && s.shares.some((x) => x.id === a.id)) return s;
+      const type = a.source?.type === "todo" ? "todo" : "habit";
+      const src: Habit | Todo | undefined = type === "todo" ? ownTodo(s, me, a.source?.id) : ownHabit(s, me, a.source?.id);
+      if (!src) throw new Nope("Only your own quests can be shared.");
+      if ((src as Habit).archivedOn) throw new Nope("Retired habits can't be shared. Start it again first.");
+      if ((src as Todo).done) throw new Nope("That quest is already done. Share one that's still open.");
+      if (liveShare(s, src.shareId, me)) throw new Nope("This one is already shared. Invite more cousins from its details.");
+      const invited = invitees(s, me, a.invite);
+      if (!invited.length) throw new Nope("Pick at least one cousin to invite.");
+      if (s.shares.filter((x) => x.createdBy === me && isLive(x, t)).length >= MAX_LIVE_SHARES) throw new Nope("You're running a lot of shared quests. Let a few finish first.");
+      const mode: SharedQuest["mode"] = a.mode === "team" ? "team" : "together";
+      const endsOn = isDate(a.endsOn) && a.endsOn >= t && a.endsOn <= addDays(t, 365) ? a.endsOn : mode === "team" ? addDays(t, 6) : undefined;
+      const target = mode === "team" ? int(a.target, 2, 1000) : undefined;
+      const bonus = mode === "team" && a.bonus ? teamBonusFor(daysBetween(t, endsOn!) + 1) : undefined;
+      const now = Date.now();
+      const members: Record<string, ShareMember> = { [me]: { status: "accepted", invitedBy: me, invitedAt: now, respondedAt: now, joinedOn: t, copyId: src.id } };
+      for (const p of invited) members[p] = { status: "pending", invitedBy: me, invitedAt: now };
+      const sq = tidy({
+        id: newId(a.id, s.shares), kind: type, mode, title: src.title, desc: para(a.desc, 240) || undefined, icon: src.icon, dim: src.dim, dim2: src.dim2, xp: src.xp,
+        days: type === "habit" ? (src as Habit).days : undefined, private: src.private, createdBy: me, startsOn: t, endsOn, target, bonus, members, created: now,
+      }) as SharedQuest;
+      const link = <T extends Habit | Todo>(x: T): T => (x.id === src.id && x.userId === me ? tidy({ ...x, shareId: sq.id, ...(type === "habit" && endsOn ? { endsOn } : {}) }) : x);
+      const next: GameState = { ...s, shares: [sq, ...s.shares], habits: s.habits.map(link), todos: s.todos.map(link) };
+      return inviteNotify(next, sq, me, invited);
+    }
+    case "shareInvite": {
+      const sq = shareOf(s, a.id);
+      if (!sq || !isLive(sq, t) || sq.members[me]?.status !== "accepted") return s;
+      // invite anyone not already in or asked; people who declined or left can be asked again
+      const invited = invitees(s, me, a.invite).filter((p) => !["pending", "accepted"].includes(sq.members[p]?.status ?? ""));
+      if (!invited.length) return s;
+      const now = Date.now();
+      let next = s;
+      for (const p of invited) {
+        const prev = sq.members[p];
+        next = setMember(next, sq.id, p, { status: "pending", invitedBy: me, invitedAt: now, joinedOn: prev?.joinedOn, leftOn: prev?.leftOn, copyId: prev?.copyId });
+      }
+      return inviteNotify(next, sq, me, invited);
+    }
+    case "shareRespond": {
+      const sq = shareOf(s, a.id);
+      const m = sq?.members[me];
+      if (!sq || !m || m.status !== "pending") return s;
+      if (!isLive(sq, t)) throw new Nope("This shared quest has already ended.");
+      const now = Date.now();
+      if (!a.accept) {
+        const next = setMember(s, sq.id, me, { ...m, status: "declined", respondedAt: now });
+        return notify(next, "users", `${nameOf(s, me)} can't join “${sq.title}” this time`, undefined, [m.invitedBy], { from: me, link: shareLink(sq.id) });
+      }
+      const template = { title: sq.title, icon: sq.icon, dim: sq.dim, dim2: sq.dim2, xp: sq.xp, shareId: sq.id };
+      const visibility = { private: sq.private };
+      let next = s;
+      let copyId: string;
+      const old = m.copyId && (sq.kind === "habit" ? ownHabit(s, me, m.copyId) : ownTodo(s, me, m.copyId));
+      if (old) {
+        // coming back after leaving: pick up the same copy, so earlier progress still counts
+        copyId = old.id;
+        if (sq.kind === "habit") next = { ...next, habits: next.habits.map((h) => (h.id === old.id ? tidy({ ...h, ...template, days: sq.days, endsOn: sq.endsOn, archivedOn: undefined }) : h)) };
+        else next = { ...next, todos: next.todos.map((x) => (x.id === old.id ? { ...tidy({ ...x, ...template }), done: x.done } : x)) };
+      } else if (sq.kind === "habit") {
+        if (s.habits.filter((h) => h.userId === me && !h.archivedOn).length >= MAX_HABITS) throw new Nope(`You can have up to ${MAX_HABITS} daily quests. Retire one first.`);
+        copyId = newId(a.copyId, s.habits);
+        next = { ...next, habits: [...next.habits, tidy({ id: copyId, userId: me, ...template, ...visibility, days: sq.days, endsOn: sq.endsOn, created: t }) as Habit] };
+      } else {
+        if (s.todos.filter((x) => x.userId === me && !x.done).length >= MAX_OPEN_TODOS) throw new Nope("That's a lot of open quests. Finish or clear a few first.");
+        copyId = newId(a.copyId, s.todos);
+        next = { ...next, todos: [...next.todos, { ...tidy({ id: copyId, userId: me, ...template, ...visibility, created: t }), done: false } as Todo] };
+      }
+      next = setMember(next, sq.id, me, { ...m, status: "accepted", respondedAt: now, joinedOn: m.joinedOn ?? t, leftOn: undefined, copyId });
+      const tell = Array.from(new Set([sq.createdBy, m.invitedBy])).filter((p) => p !== me);
+      return notify(next, "users", `${nameOf(s, me)} joined “${sq.title}”`, sq.mode === "team" ? "One more on the team." : "You're in it together now.", tell, { from: me, link: shareLink(sq.id), kind: "cousins" });
+    }
+    case "shareLeave": {
+      const sq = shareOf(s, a.id);
+      const m = sq?.members[me];
+      if (!sq || !m || m.status !== "accepted" || sq.createdBy === me || !isLive(sq, t)) return s;
+      let next = s;
+      let leftOn = t;
+      // your history stays: a used habit is retired, a finished quest is kept, an untouched one-time quest goes
+      if (sq.kind === "habit") {
+        const h = ownHabit(s, me, m.copyId);
+        if (h && !h.archivedOn) { const r = retireHabit(next, me, h, t); next = r.s; leftOn = r.on; }
+      } else {
+        const td = ownTodo(s, me, m.copyId);
+        if (td && !td.done) next = { ...next, todos: next.todos.filter((x) => x.id !== td.id) };
+        if (td?.done) leftOn = addDays(t, 1);
+      }
+      next = setMember(next, sq.id, me, { ...m, status: "left", leftOn });
+      return notify(next, "users", `${nameOf(s, me)} left “${sq.title}”`, "Their progress so far still counts.", [sq.createdBy], { from: me, link: shareLink(sq.id) });
+    }
+    case "shareEnd": {
+      const sq = shareOf(s, a.id);
+      if (!sq || sq.createdBy !== me || sq.endedOn) return s;
+      // nobody loses anything: each participant keeps their copy as a personal quest, with its history
+      const next = { ...s, shares: s.shares.map((x) => (x.id === sq.id ? { ...x, endedOn: t } : x)) };
+      const others = Object.keys(sq.members).filter((p) => p !== me && sq.members[p].status === "accepted");
+      return notify(next, "users", `${nameOf(s, me)} ended “${sq.title}”`, "It stays in your quests as a personal one, with all your progress.", others, { from: me, link: shareLink(sq.id), kind: "missions" });
+    }
+
     case "notifsRead": {
       const newest = s.notifs.filter((n) => !n.to || n.to.includes(me)).reduce((m, n) => Math.max(m, n.ts), 0);
       return { ...s, notifsSeen: { ...s.notifsSeen, [me]: Math.max(newest, s.notifsSeen[me] ?? 0) } };
@@ -527,12 +717,50 @@ function syncChallenges(s: GameState): GameState {
 }
 
 /**
+ * Shared quests: a team quest's bonus is paid to each contributing cousin
+ * when the shared target is met (and taken back if completions are undone)
+ * until it ends, after which the result is final. When everyone in a shared
+ * habit completes it on the same day, that's worth a moment in the feed.
+ * Neither adds Aura beyond what the quest's rules said up front.
+ */
+function syncShares(s: GameState): GameState {
+  const t = today();
+  let next = s;
+  for (const sq of s.shares) {
+    if (!isLive(sq, t)) continue;
+    const p = shareProgress(next, sq, t);
+    if (sq.mode === "team" && sq.target) {
+      const met = p.total >= sq.target;
+      if (sq.bonus) {
+        const ref = `sq:${sq.id}`;
+        for (const m of p.members) {
+          // anyone who contributed and is still in; someone who leaves later keeps what they earned
+          const eligible = m.done > 0 && (m.status === "accepted" || hasRef(next, m.id, ref));
+          next = setRef(next, m.id, ref, met && eligible, { label: `Team quest complete: ${sq.title}`, xp: sq.bonus, dim: sq.dim, kind: "challenge", tag: "mission" });
+        }
+      }
+      const ref = `sqdone:${sq.id}`;
+      const posted = next.feed.some((e) => e.ref === ref);
+      if (met && !posted) next = share(next, { userId: sq.createdBy, kind: "together", text: `Team quest complete: ${sq.title}`, dim: sq.dim, xp: sq.bonus, ref });
+      else if (!met && posted) next = { ...next, feed: next.feed.filter((e) => e.ref !== ref) };
+    }
+    if (sq.kind === "habit") {
+      const ref = `sqall:${sq.id}:${t}`;
+      const posted = next.feed.some((e) => e.ref === ref);
+      if (p.allDoneToday && !posted) next = share(next, { userId: sq.createdBy, kind: "together", text: `Everyone completed today's ${sq.title}!`, dim: sq.dim, ref });
+      else if (!p.allDoneToday && posted) next = { ...next, feed: next.feed.filter((e) => e.ref !== ref) };
+    }
+  }
+  return next;
+}
+
+/**
  * Records newly earned badges and levels, daily objectives and rivalry
  * results, and posts them to the feed. `ids` limits the per-cousin part to
  * some members (the client only knows its own private data).
  */
 export function syncProgress(s: GameState, opts: { ids?: string[]; silent?: boolean } = {}): GameState {
-  let next = syncChallenges(s);
+  let next = syncShares(syncChallenges(s));
   const t = today();
   for (const m of next.members) {
     if (opts.ids && !opts.ids.includes(m.id)) continue;

@@ -4,6 +4,7 @@ import {
   Medal, Moon, Mountain, Music, Orbit, Palette, PenLine, PiggyBank, Phone, Shield, ShieldCheck, Sparkles, Sprout, Sun, Swords, Target,
   ThumbsUp, TrendingUp, Trophy, Users, Waves, Wind, Zap, type LucideIcon,
 } from "lucide-react";
+import { REACTION_LABELS } from "@/lib/catalog";
 import type { DimId, NotifIcon, ReactionKind } from "@/lib/types";
 
 /** One line icon per life dimension. */
@@ -30,14 +31,15 @@ export const NOTIF_ICON: Record<NotifIcon, LucideIcon> = {
   bolt: Zap, trophy: Trophy, level: TrendingUp, badge: Medal, goal: Target, users: Users, rest: CalendarCheck, duel: Swords, quest: Award, react: Zap,
 };
 
+/** Positive reactions only, never Aura. */
 export const REACTIONS: { id: ReactionKind; label: string; icon: LucideIcon }[] = [
-  { id: "zap", label: "Charged", icon: Zap },
-  { id: "fire", label: "On fire", icon: Flame },
-  { id: "clap", label: "Respect", icon: ThumbsUp },
-  { id: "heart", label: "Proud of you", icon: HandHeart },
+  { id: "clap", label: REACTION_LABELS.clap, icon: ThumbsUp },
+  { id: "zap", label: REACTION_LABELS.zap, icon: Zap },
+  { id: "heart", label: REACTION_LABELS.heart, icon: HandHeart },
+  { id: "fire", label: REACTION_LABELS.fire, icon: Flame },
 ];
 
 export const FEED_ICON: Record<string, LucideIcon> = {
   quest: Zap, streak: Flame, challenge: Flag, mission: Handshake, meetup: Users, goal: Target, level: TrendingUp,
-  badge: Medal, daily: Sun, rivalry: Swords, started: Clapperboard,
+  badge: Medal, daily: Sun, rivalry: Swords, started: Clapperboard, together: Handshake,
 };

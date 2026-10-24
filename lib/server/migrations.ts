@@ -1,4 +1,4 @@
-import { EMOJI_TO_ICON } from "../catalog";
+import { CHARACTER, CHARACTERS, EMOJI_TO_ICON, LEGACY_CHARACTERS } from "../catalog";
 import { emptyGame, toStored } from "../seed";
 import { addDays, monthStart, today, uid } from "../utils";
 
@@ -8,7 +8,7 @@ import { addDays, monthStart, today, uid } from "../utils";
  * startup never resets or clears data: only a migration may change stored
  * content, and only in the specific way it describes.
  */
-export const LATEST_SCHEMA = 5;
+export const LATEST_SCHEMA = 6;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Raw = any;
@@ -93,6 +93,39 @@ const MIGRATIONS: Record<number, { name: string; up: (db: Raw) => void }> = {
       for (const u of db.users ?? []) delete u.frame; // frames were unlocked by badges that no longer exist
       db.rev = (db.rev ?? 0) + 1;
       console.log(`[thunderstorms] migration 5: cleared game data for ${(db.users ?? []).length} account(s)`);
+    },
+  },
+  6: {
+    name: "character portraits, shared quests and notification categories",
+    up(db) {
+      // Additive and per-account only: no quest, log, goal or photo changes.
+      db.game.shares ??= [];
+      const users: Raw[] = db.users ?? [];
+
+      // The drawn characters are replaced by the five portraits. Each cousin moves to the portrait
+      // closest in colour (still one per cousin); cousins with neither a character nor a photo get a
+      // free one so every card has a face. Anyone can pick a different one afterwards. Photos are untouched.
+      const taken = new Set<string>(users.map((u) => u.character).filter((c: unknown) => typeof c === "string" && CHARACTER[c as string]));
+      const free = () => CHARACTERS.find((c) => !taken.has(c.id))?.id;
+      for (const u of [...users].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))) {
+        if (u.character && CHARACTER[u.character]) continue;
+        const want = u.character ? LEGACY_CHARACTERS[u.character] : undefined;
+        const pick = want && !taken.has(want) ? want : u.character || !u.photo ? free() : undefined;
+        if (pick) { u.character = pick; taken.add(pick); } else delete u.character;
+      }
+
+      // Notification kinds became categories; earlier choices carry over.
+      for (const u of users) {
+        const k = u.notify?.kinds;
+        if (!k) continue;
+        const next: Record<string, boolean> = {};
+        if (typeof k.daily === "boolean") { next.habits = k.daily; next.quests = k.daily; }
+        if (typeof k.overtaken === "boolean") next.leaderboard = k.overtaken;
+        if (typeof k.challengeDone === "boolean" || typeof k.ending === "boolean") next.missions = k.challengeDone !== false || k.ending !== false;
+        for (const key of ["habits", "quests", "invites", "cousins", "leaderboard", "missions", "recap", "meetups"]) if (typeof k[key] === "boolean") next[key] = k[key];
+        u.notify.kinds = next;
+      }
+      db.rev = (db.rev ?? 0) + 1;
     },
   },
 };

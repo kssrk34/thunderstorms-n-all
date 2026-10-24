@@ -109,7 +109,8 @@ export function habitStreak(s: GameState, userId: string, h: Habit, t = today())
 }
 
 /* ---------- today ---------- */
-export const habitsFor = (s: GameState, id: string) => s.habits.filter((h) => h.userId === id && !h.archivedOn);
+/** A cousin's current habits: not retired, and not a shared habit whose end date has passed. */
+export const habitsFor = (s: GameState, id: string, t = today()) => s.habits.filter((h) => h.userId === id && !h.archivedOn && !(h.endsOn && h.endsOn < t));
 
 export interface Priority { type: "habit" | "todo"; id: string; title: string; xp: number; done: boolean; dim: DimId; picked: boolean }
 
@@ -117,7 +118,7 @@ export interface Priority { type: "habit" | "todo"; id: string; title: string; x
 export function dailyPlan(s: GameState, id: string, goal: DailyGoal = "auto", t = today()) {
   const refs = ledger(s, id).refs;
   const rested = (s.restDays[id] ?? []).includes(t);
-  const due = habitsFor(s, id).filter((h) => isDue(h, t));
+  const due = habitsFor(s, id, t).filter((h) => isDue(h, t));
   const doneH = (h: Habit) => refs.has(`h:${h.id}:${t}`);
   const todos = s.todos.filter((x) => x.userId === id && (!x.done || x.doneOn === t));
   const picked = s.priorities[id]?.date === t ? s.priorities[id].ids : [];

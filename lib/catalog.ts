@@ -1,4 +1,4 @@
-import type { ActiveDim, Challenge, DimId, NotifyKind, Rivalry } from "./types";
+import type { ActiveDim, Challenge, DimId, NotifyCategory, Rivalry } from "./types";
 
 /* ------------------------------------------------------------------ */
 /* Ten life dimensions                                                 */
@@ -41,20 +41,32 @@ export const MAX_MEMBERS = 5;
 /* ------------------------------------------------------------------ */
 /* Identity: characters, frames, ranks                                 */
 /* ------------------------------------------------------------------ */
-export interface Character { id: string; name: string; title: string; color: string; tagline: string }
+/**
+ * A character portrait. `color` themes everything around it (borders, Aura
+ * accent, level badge, profile header); `deep` is the darker tone used
+ * behind it.
+ */
+export interface Character { id: string; name: string; title: string; color: string; deep: string; tagline: string }
 
-/** Original storm-agent characters. Each can be claimed by one cousin. */
+/**
+ * The five official characters, from the squad's own artwork (public/avatars).
+ * Each can be claimed by one cousin; nobody is tied to one by name.
+ */
 export const CHARACTERS: Character[] = [
-  { id: "volt", name: "Volt", title: "The Striker", color: "#3FD0FF", tagline: "First in, fastest out." },
-  { id: "nimbus", name: "Nimbus", title: "The Warden", color: "#8FB4E8", tagline: "Calm before every storm." },
-  { id: "aurelia", name: "Aurelia", title: "The Skyblade", color: "#F5B544", tagline: "Rides the lightning, never the wind." },
-  { id: "rune", name: "Rune", title: "The Seer", color: "#A78BFA", tagline: "Reads the storm before it breaks." },
-  { id: "tempest", name: "Tempest", title: "The Rogue", color: "#4C8DFF", tagline: "Rules are just weather." },
-  { id: "aegis", name: "Aegis", title: "The Guardian", color: "#2DD2B7", tagline: "Holds the line. Every day." },
-  { id: "sable", name: "Sable", title: "The Shade", color: "#E87DCB", tagline: "Strikes from the dark." },
-  { id: "gale", name: "Gale", title: "The Ranger", color: "#47D188", tagline: "Always one ridge further." },
+  { id: "storm-blue", name: "Electric Blue", title: "The Builder", color: "#3B82F6", deep: "#0B1E4A", tagline: "Discipline today. A stronger tomorrow." },
+  { id: "storm-magenta", name: "Magenta", title: "The Learner", color: "#C651E8", deep: "#3A0D4A", tagline: "Curiosity fuels a brighter me." },
+  { id: "storm-cyan", name: "Aquamarine", title: "The Solver", color: "#14B8B0", deep: "#06323A", tagline: "Better ideas. Bigger possibilities." },
+  { id: "storm-gold", name: "Golden Radiance", title: "The Connector", color: "#E8A23A", deep: "#4A2C08", tagline: "People. Purpose. A kinder world." },
+  { id: "storm-violet", name: "Deep Violet", title: "The Performer", color: "#7C5CF0", deep: "#1E1048", tagline: "Progress, not perfection." },
 ];
 export const CHARACTER = Object.fromEntries(CHARACTERS.map((c) => [c.id, c])) as Record<string, Character>;
+export type CharacterImage = "avatar" | "portrait" | "full";
+/** avatar: square face crop for round avatars; portrait: 4:5 for cards; full: the whole tall panel. */
+export const characterImage = (id: string, kind: CharacterImage = "avatar") => `/avatars/${kind}-${id}.webp`;
+/** The drawn characters of earlier versions, and the portrait closest to each in colour (used once, by migration 6). */
+export const LEGACY_CHARACTERS: Record<string, string> = {
+  tempest: "storm-blue", nimbus: "storm-blue", sable: "storm-magenta", volt: "storm-cyan", aegis: "storm-cyan", gale: "storm-cyan", aurelia: "storm-gold", rune: "storm-violet",
+};
 
 /** Avatar frames. Each one after the first is unlocked by an achievement. */
 export const FRAMES: { id: string; name: string; badge?: string; hint: string }[] = [
@@ -187,13 +199,26 @@ export const PRIVATE_ACTIVITIES = new Set(["journal", "save"]);
 /* ------------------------------------------------------------------ */
 /* Notifications                                                       */
 /* ------------------------------------------------------------------ */
-export const NOTIFY_KINDS: { id: Exclude<NotifyKind, "test">; label: string; example: string }[] = [
-  { id: "daily", label: "Daily quest reminder", example: "Your daily quests are waiting." },
-  { id: "overtaken", label: "A cousin passes your weekly score", example: "Your cousin just passed your weekly Aura Points score." },
-  { id: "challengeDone", label: "Challenge or mission completed", example: "You've completed your weekly challenge!" },
-  { id: "ending", label: "Group challenge ending soon", example: "The group challenge ends tomorrow." },
-  { id: "recap", label: "Weekly recap ready", example: "Your weekly Life Balance recap is ready." },
+export const NOTIFY_KINDS: { id: NotifyCategory; label: string; example: string }[] = [
+  { id: "habits", label: "Habit reminders", example: "Your evening reading habit is still waiting. Complete it to earn 20 Aura." },
+  { id: "quests", label: "Quest reminders", example: "2 one-time quests are still open today." },
+  { id: "invites", label: "Invitation alerts", example: "Your cousin invited you to a 7-day reading habit. Want to join?" },
+  { id: "cousins", label: "Cousin activity", example: "Your cousin just reached a 14-day streak." },
+  { id: "leaderboard", label: "Leaderboard updates", example: "Someone just overtook you in this week's Aura leaderboard." },
+  { id: "missions", label: "Missions and team quests", example: "Your team quest is complete! +50 Aura Points." },
+  { id: "recap", label: "Weekly summary", example: "Last week: +320 Aura, 18 quests, 86% consistency." },
+  { id: "meetups", label: "Meetups", example: "Your cousin logged a meetup with you." },
 ];
+/** Off until a cousin turns them on: these can be chatty. */
+export const NOTIFY_OFF_BY_DEFAULT: NotifyCategory[] = ["cousins"];
+
+/* ------------------------------------------------------------------ */
+/* Shared quests                                                       */
+/* ------------------------------------------------------------------ */
+/** Aura for each contributing cousin when a team quest meets its target, by length. Fixed when it's created. */
+export const teamBonusFor = (days: number) => (days <= 7 ? 50 : days <= 14 ? 75 : 100);
+/** Positive reactions on a cousin's completion. They never award Aura. */
+export const REACTION_LABELS: Record<"zap" | "fire" | "clap" | "heart", string> = { clap: "Well done", zap: "Strong work", heart: "Keep going", fire: "Nice streak" };
 
 /* ------------------------------------------------------------------ */
 /* Meetups                                                             */

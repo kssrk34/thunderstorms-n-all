@@ -86,6 +86,12 @@ export interface Habit {
   created: string;
   /** retired from this date on; history before it still counts */
   archivedOn?: string;
+  /** the shared quest this is the owner's copy of */
+  shareId?: string;
+  /** last day it's due (shared habits with an end date) */
+  endsOn?: string;
+  /** hour (India time) for a personal reminder about this habit */
+  remindAt?: number;
 }
 
 /** A one-time quest. */
@@ -103,6 +109,59 @@ export interface Todo {
   goalId?: string;
   private?: boolean;
   created: string;
+  /** the shared quest this is the owner's copy of */
+  shareId?: string;
+}
+
+export type InviteStatus = "pending" | "accepted" | "declined" | "left";
+
+/** One cousin's place in a shared quest: invited, joined, declined or left. */
+export interface ShareMember {
+  status: InviteStatus;
+  invitedBy: string;
+  invitedAt: number;
+  respondedAt?: number;
+  /** the day they joined; their progress counts from here */
+  joinedOn?: string;
+  /** the day they left; their earlier progress still counts */
+  leftOn?: string;
+  /** id of their own habit or one-time quest for it */
+  copyId?: string;
+}
+
+/**
+ * A quest or habit cousins do together. Each participant has their own copy
+ * (a normal habit or one-time quest), so completions, streaks, Aura and Life
+ * Balance stay individual.
+ * - together: everyone completes it independently, side by side
+ * - team: completions add up toward one shared target before the deadline
+ */
+export interface SharedQuest {
+  id: string;
+  kind: "habit" | "todo";
+  mode: "together" | "team";
+  title: string;
+  desc?: string;
+  icon?: string;
+  dim: ActiveDim;
+  dim2?: ActiveDim;
+  xp: number;
+  /** weekdays a shared habit is due, Monday = 0; missing means every day */
+  days?: number[];
+  /** the organiser's visibility choice, which new copies start with: private titles stay hidden from cousins outside it */
+  private?: boolean;
+  createdBy: string;
+  startsOn: string;
+  endsOn?: string;
+  /** team: total completions needed */
+  target?: number;
+  /** team: Aura each contributing participant earns when the target is met, fixed when it was created */
+  bonus?: number;
+  /** everyone ever invited, keyed by user id; the organiser is "accepted" from the start */
+  members: Record<string, ShareMember>;
+  /** the organiser ended it; everyone keeps their copy as a personal quest */
+  endedOn?: string;
+  created: number;
 }
 
 /**
@@ -198,7 +257,7 @@ export interface FeedEvent {
   id: string;
   ts: number;
   userId: string;
-  kind: "quest" | "streak" | "challenge" | "mission" | "meetup" | "goal" | "level" | "badge" | "daily" | "rivalry" | "started";
+  kind: "quest" | "streak" | "challenge" | "mission" | "meetup" | "goal" | "level" | "badge" | "daily" | "rivalry" | "started" | "together";
   text: string;
   dim?: DimId;
   xp?: number;
@@ -217,6 +276,14 @@ export interface Notif {
   body?: string;
   /** recipients; missing means the whole squad (older notifications) */
   to?: string[];
+  /** the cousin it's about, for their avatar */
+  from?: string;
+  /** where tapping it goes */
+  link?: string;
+  /** also sent as a phone notification in this category, if the recipient opted in */
+  kind?: NotifyCategory;
+  /** what it refers to, e.g. "share:<id>" for an invitation */
+  ref?: string;
 }
 
 /* ---------- kept only for history from earlier versions ---------- */
@@ -236,6 +303,8 @@ export interface GameState {
   todos: Todo[];
   habits: Habit[];
   challenges: Challenge[];
+  /** quests and habits shared between cousins, with their invitations */
+  shares: SharedQuest[];
   rivalries: Rivalry[];
   meetups: Meetup[];
   memories: Memory[];
@@ -287,7 +356,10 @@ export interface MemberStats {
 }
 
 /* ---------- notifications ---------- */
-export type NotifyKind = "daily" | "overtaken" | "challengeDone" | "ending" | "recap" | "test";
+/** What a phone notification is about. Each can be switched on or off. */
+export type NotifyCategory = "habits" | "quests" | "invites" | "cousins" | "leaderboard" | "missions" | "recap" | "meetups";
+/** Categories, plus a test message and kinds recorded by earlier versions. */
+export type NotifyKind = NotifyCategory | "test" | "daily" | "overtaken" | "challengeDone" | "ending";
 
 /** A cousin's choices about messages outside the app. Everything is off until they opt in. */
 export interface NotifyPrefs {
@@ -298,7 +370,7 @@ export interface NotifyPrefs {
   whatsapp: boolean;
   whatsappAt?: number;
   push: boolean;
-  kinds: Record<Exclude<NotifyKind, "test">, boolean>;
+  kinds: Record<NotifyCategory, boolean>;
   /** quiet hours, India time; no messages from start until end */
   quietStart: number;
   quietEnd: number;
@@ -322,6 +394,8 @@ export interface OutboxItem {
   updatedAt: number;
   status: OutboxStatus;
   attempts: number;
+  /** the headline on a phone notification */
+  title?: string;
   /** the exact text, which never includes other cousins' private data */
   body: string;
   url?: string;

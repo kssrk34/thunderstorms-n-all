@@ -12,7 +12,7 @@ import { AvatarView, RankEmblem } from "./avatars";
 import { AuraIcon } from "./brand";
 import { AREA_ICON, QUEST_ICON } from "./icons";
 
-export { AvatarView, CharacterArt, RankEmblem, memberColor } from "./avatars";
+export { AvatarView, CharacterArt, MemberPortrait, RankEmblem, memberColor } from "./avatars";
 
 /* ---------- people ---------- */
 export function Avatar({ id, size = 40, className, frame }: { id: string; size?: number; className?: string; frame?: boolean }) {

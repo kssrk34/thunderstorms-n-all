@@ -17,14 +17,18 @@ const POLL_MS = 12_000;
 
 export interface Toast { id: string; text: string; tone: "aura" | "info" | "warn"; aura?: number }
 export interface Celebration { kind: "badge" | "level"; badgeId?: string; title: string; body: string }
-export interface QuestPreset { kind?: QuestKind; title?: string; dim?: ActiveDim; icon?: string; xp?: number; goalId?: string; edit?: { type: "habit" | "todo"; id: string } }
+export interface QuestPreset { kind?: QuestKind; title?: string; dim?: ActiveDim; icon?: string; xp?: number; goalId?: string; edit?: { type: "habit" | "todo"; id: string }; invite?: boolean }
 export interface GoalPreset { title?: string; dim?: ActiveDim; edit?: string }
 export type Sheet =
   | { kind: "quest"; preset?: QuestPreset }
   | { kind: "goal"; preset?: GoalPreset }
   | { kind: "log" }
   | { kind: "rivalry" }
-  | { kind: "meetup" };
+  | { kind: "meetup" }
+  /** invite cousins: to a new shared quest made from one of yours, or to an existing one */
+  | { kind: "invite"; source?: { type: "habit" | "todo"; id: string }; shareId?: string }
+  /** a shared quest's details and participants */
+  | { kind: "share"; id: string };
 
 export interface ProfilePatch { name?: string; bio?: string; character?: string | null; photo?: string | null; frame?: string; onboarded?: boolean; dailyGoal?: DailyGoal; shareActivity?: boolean }
 

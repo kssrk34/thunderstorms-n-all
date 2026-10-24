@@ -1,3 +1,4 @@
+import { canSeeEvent } from "../shared";
 import { memberStats } from "../stats";
 import type { FeedEvent, GameState, Goal, LogEntry, Me, Member, MemberStats, View } from "../types";
 import { today } from "../utils";
@@ -37,6 +38,9 @@ const COMPLETION_EVENTS = new Set<FeedEvent["kind"]>(["quest", "streak", "challe
  * What one cousin is allowed to see.
  * - Shared: profiles, Aura totals, achievements, challenges, rivalries,
  *   meetups, shared goals, the feed, and aggregated Life Balance scores.
+ * - Only to the cousins invited: shared quests and habits, their invitations
+ *   and their moments in the feed. Participants see each other's progress
+ *   on them through the ledger, never each other's other habits.
  * - Only to the owner: daily and one-time quests, private goals, today's
  *   priorities, notes, money amounts, and anything from earlier versions that
  *   was personal (health, mood, reviews, savings).
@@ -68,7 +72,9 @@ export function viewFor(db: DB, userId: string): View {
     habits: game.habits.filter(mine),
     todos: game.todos.filter(mine),
     goals: game.goals.filter((x) => mine(x) || !x.private).map(goal),
-    feed: game.feed.filter((e) => e.userId === userId || sharing.get(e.userId) || !COMPLETION_EVENTS.has(e.kind)),
+    // a shared quest, its invitations and its moments are only for the cousins invited to it
+    shares: game.shares.filter((x) => userId in x.members),
+    feed: game.feed.filter((e) => (e.userId === userId || sharing.get(e.userId) || !COMPLETION_EVENTS.has(e.kind)) && canSeeEvent(game, e, userId)),
     notifs: game.notifs.filter((n) => !n.to || n.to.includes(userId)).map(({ to: _to, ...n }) => n),
     notifsSeen: own(game.notifsSeen),
     priorities: own(game.priorities),

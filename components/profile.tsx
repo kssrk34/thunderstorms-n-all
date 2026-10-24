@@ -7,7 +7,7 @@ import { CHARACTER, FRAMES, RANKS } from "@/lib/catalog";
 import { useGame } from "@/lib/store";
 import type { DailyGoal, LogEntry, Member } from "@/lib/types";
 import { cn, dstr, fmtShort, plural, today, weekStart } from "@/lib/utils";
-import { AreaTag, AuraChip, AvatarView, RankEmblem, Section, Stat, memberColor, pct, useLevel } from "./game";
+import { AreaTag, AuraChip, AvatarView, MemberPortrait, RankEmblem, Section, Stat, memberColor, pct, useLevel } from "./game";
 import { BADGE_ICON } from "./icons";
 import { Card } from "./ui/card";
 import { List, ListRow } from "./ui/list";
@@ -26,14 +26,19 @@ export function ProfileHero({ m, actions }: { m: Member; actions?: ReactNode }) 
   const joined = new Date(m.joinedAt).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
   return (
     <Card className="relative overflow-hidden p-6 sm:p-8">
-      <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(70% 90% at 15% 0%, ${color}30, transparent 65%)` }} />
-      <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center">
-        <AvatarView member={m} size={132} className="shrink-0 shadow-[0_20px_50px_-20px_rgba(0,0,0,.9)]" />
+      <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(70% 90% at 12% 0%, ${color}2e, transparent 65%), linear-gradient(90deg, transparent 55%, ${color}14)` }} />
+      {c && !m.photo && (
+        <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 hidden w-[42%] md:block" style={{ maskImage: "linear-gradient(90deg, transparent, #000 45%)", WebkitMaskImage: "linear-gradient(90deg, transparent, #000 45%)" }}>
+          <MemberPortrait member={m} kind="full" className="object-[50%_22%] opacity-90" />
+        </div>
+      )}
+      <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center md:max-w-[68%]">
+        <AvatarView member={m} size={132} className="shrink-0 shadow-[0_20px_50px_-20px_rgba(0,0,0,.6)]" />
         <div className="min-w-0 flex-1">
           {c && !m.photo && <div className="eyebrow" style={{ color }}>{c.name} · {c.title}</div>}
           <h1 className="mt-1 font-display text-[32px] font-bold leading-tight tracking-tight">{m.name}</h1>
           <p className="text-[14px] text-muted-foreground">@{m.username} · Joined {joined}</p>
-          {m.bio && <p className="mt-3 max-w-lg text-[15px]">{m.bio}</p>}
+          {m.bio ? <p className="mt-3 max-w-lg text-[15px]">{m.bio}</p> : c && !m.photo ? <p className="mt-3 max-w-lg text-[15px] italic text-muted-foreground">&ldquo;{c.tagline}&rdquo;</p> : null}
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <div className="flex items-center gap-3">
               <RankEmblem tier={rank.tier} division={rank.division} size={46} />
@@ -43,9 +48,9 @@ export function ProfileHero({ m, actions }: { m: Member; actions?: ReactNode }) 
               </div>
             </div>
             <div>
-              <div className="flex items-baseline justify-between text-[13px]"><span className="font-medium">Level {L.level} · {L.title}</span><span className="tabular-nums text-muted-foreground">{L.into}/{L.span}</span></div>
-              <Progress value={L.pct * 100} className="mt-1.5 h-2" />
-              <div className="mt-1 text-[11px] text-muted-foreground">{L.aura.toLocaleString("en-IN")} lifetime Aura Points</div>
+              <div className="flex items-baseline justify-between text-[13px]"><span className="inline-flex items-center gap-1.5 font-medium"><span className="rounded-md px-1.5 py-0.5 text-[11px] font-bold text-white" style={{ background: color }}>Lv {L.level}</span>{L.title}</span><span className="tabular-nums text-muted-foreground">{L.into}/{L.span}</span></div>
+              <Progress value={L.pct * 100} className="mt-1.5 h-2" color={color} />
+              <div className="mt-1 text-[11px] text-muted-foreground"><span className="font-semibold" style={{ color }}>{L.aura.toLocaleString("en-IN")}</span> lifetime Aura Points</div>
             </div>
           </div>
         </div>

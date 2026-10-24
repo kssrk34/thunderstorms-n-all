@@ -71,9 +71,11 @@ async function login(username) {
   check(aura(v3, "u1asha") === a0 + 15 + 20, "Totals add up after the duplicate attempt");
 
   // ---------- characters ----------
-  const c1 = await asha.call("/api/profile", { method: "PATCH", body: { character: "volt" } });
-  check(c1.status === 200 && c1.data.me.character === "volt", "Asha claims Volt");
-  const c2 = await bala.call("/api/profile", { method: "PATCH", body: { character: "volt" } });
+  const c0 = await asha.call("/api/profile", { method: "PATCH", body: { character: "volt" } });
+  check(c0.status === 400, "The retired drawn characters can't be picked any more");
+  const c1 = await asha.call("/api/profile", { method: "PATCH", body: { character: "storm-violet" } });
+  check(c1.status === 200 && c1.data.me.character === "storm-violet", "Asha claims Deep Violet");
+  const c2 = await bala.call("/api/profile", { method: "PATCH", body: { character: "storm-violet" } });
   check(c2.status === 409, `Bala can't take Asha's character (${c2.status}: ${c2.data.error})`);
   const f1 = await bala.call("/api/profile", { method: "PATCH", body: { frame: "gilded" } });
   check(f1.status === 403, `Locked frames are refused (${f1.status})`);

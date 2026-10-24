@@ -16,6 +16,18 @@ export function FeedItem({ e, compact }: { e: FeedEvent; compact?: boolean }) {
   const Icon = FEED_ICON[e.kind] ?? FEED_ICON.quest;
   const color = e.dim ? DIM[e.dim].color : e.kind === "badge" || e.kind === "level" || e.kind === "rivalry" ? "hsl(var(--accent))" : "hsl(var(--primary))";
   const counts = REACTIONS.map((r) => ({ ...r, n: Object.values(e.reactions).filter((k) => k === r.id).length, on: e.reactions[me] === r.id }));
+  if (e.kind === "together") {
+    // a group moment: everyone in a shared quest, so no single name in front
+    return (
+      <div className={cn("flex gap-3", compact ? "py-2.5" : "px-4 py-3.5")}>
+        <span className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full bg-[linear-gradient(135deg,hsl(var(--primary)),hsl(var(--arc)))] text-white shadow-[0_6px_16px_-6px_hsl(var(--primary))]"><Icon className="h-[18px] w-[18px]" /></span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[14px] font-semibold leading-snug">{e.text}</p>
+          <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground"><span>{timeAgo(e.ts)}</span>{e.xp ? <AuraChip value={e.xp} className="text-[11px]" /> : null}<span>· shared quest</span></div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className={cn("flex gap-3", compact ? "py-2.5" : "px-4 py-3.5")}>
       <Link href={`/u/${m.username}`} className="relative shrink-0" aria-label={m.name}>

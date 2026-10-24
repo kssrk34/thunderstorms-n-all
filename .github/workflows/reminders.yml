@@ -1,0 +1,33 @@
+# Runs the reminder schedule every 15 minutes, so timed reminders (daily nudges,
+# personal habit reminders, the weekly summary) go out even when nobody has the
+# app open. Vercel's free plan only allows a daily cron, so this calls the same
+# protected route from GitHub Actions instead.
+#
+# Setup (once): add a repository secret CRON_SECRET (Settings → Secrets and
+# variables → Actions) with the same value as CRON_SECRET in Vercel. Optionally
+# set a repository variable APP_URL if the site moves. Without the secret this
+# workflow does nothing.
+name: Scheduled reminders
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  run-schedule:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Call the reminder schedule
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ vars.APP_URL || 'https://thunderstorms-n-all.vercel.app' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET isn't set as a repository secret, so there's nothing to do."
+            exit 0
+          fi
+          curl -fsS --max-time 60 -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron"

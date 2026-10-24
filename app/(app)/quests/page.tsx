@@ -7,6 +7,7 @@ import { Check, ChevronDown, EyeOff, Minus, Pencil, Plus, RotateCcw } from "luci
 import { ClearSkyArt, SummitArt } from "@/components/brand";
 import { AreaIcon, AreaTag, AuraChip, AvatarView, CheckCircle, DeleteButton, EmptyState, PageHeader, QuestGlyph, Section, SuggestionChip } from "@/components/game";
 import { Button } from "@/components/ui/button";
+import { ShareButton, SharedHub, scheduleLabel } from "@/components/share";
 import { Card } from "@/components/ui/card";
 import { List } from "@/components/ui/list";
 import { Progress } from "@/components/ui/progress";
@@ -15,33 +16,37 @@ import { challengeProgress } from "@/lib/balance";
 import { DIM, GOAL_SUGGESTIONS, QUEST_SUGGESTIONS } from "@/lib/catalog";
 import { habitStreak, habitsFor, timeLeft } from "@/lib/engine";
 import { habitDone, isDue } from "@/lib/ledger";
+import { isLive, pendingInvites } from "@/lib/shared";
 import { useGame } from "@/lib/store";
-import type { Goal, Habit, Todo } from "@/lib/types";
+import type { GameState, Goal, Habit, Todo } from "@/lib/types";
 import { addDays, cn, daysBetween, fmtDay, fmtShort, plural, today } from "@/lib/utils";
 
-type Tab = "today" | "habits" | "once" | "goals";
-const TABS: Tab[] = ["today", "habits", "once", "goals"];
-const DAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const schedule = (h: Habit) => (!h.days ? "Every day" : h.days.length === 5 && h.days.every((d) => d < 5) ? "Weekdays" : h.days.length === 2 && h.days[0] === 5 ? "Weekends" : h.days.map((d) => DAY_SHORT[d]).join(", "));
+type Tab = "today" | "habits" | "once" | "shared" | "goals";
+const TABS: Tab[] = ["today", "habits", "once", "shared", "goals"];
+const schedule = (h: Habit) => scheduleLabel(h.days);
 
 function QuestsInner() {
   const params = useSearchParams();
   const router = useRouter();
   const raw = params.get("tab") as Tab | null;
   const tab: Tab = raw && TABS.includes(raw) ? raw : "today";
-  const { openSheet } = useGame();
+  const { s, me, openSheet } = useGame();
+  const invites = pendingInvites(s, me).length;
   const setTab = (v: string) => router.replace(v === "today" ? "/quests" : `/quests?tab=${v}`, { scroll: false });
   return (
     <div>
-      <PageHeader title="My Quests" subtitle="Your habits, one-time quests and goals. Only you can change them."
-        action={<Button size="sm" onClick={() => openSheet(tab === "goals" ? { kind: "goal" } : { kind: "quest", preset: { kind: tab === "once" ? "once" : "daily" } })}><Plus />New</Button>} />
+      <PageHeader title="My Quests" subtitle="Small actions. Massive outcomes. Your habits, quests and goals, and the ones you share with cousins."
+        action={<Button size="sm" onClick={() => openSheet(tab === "goals" ? { kind: "goal" } : { kind: "quest", preset: { kind: tab === "once" ? "once" : "daily", invite: tab === "shared" } })}><Plus />New</Button>} />
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="flex w-full sm:inline-flex sm:w-auto">
-          <TabsTrigger value="today">Today</TabsTrigger><TabsTrigger value="habits">Habits</TabsTrigger><TabsTrigger value="once">One-time</TabsTrigger><TabsTrigger value="goals">Goals</TabsTrigger>
+        <TabsList className="no-scrollbar flex w-full overflow-x-auto sm:inline-flex sm:w-auto">
+          <TabsTrigger value="today">Today</TabsTrigger><TabsTrigger value="habits">Habits</TabsTrigger><TabsTrigger value="once">One-time</TabsTrigger>
+          <TabsTrigger value="shared" className="inline-flex items-center justify-center gap-1.5">Shared{invites > 0 && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground" aria-label={`${invites} invitations`}>{invites}</span>}</TabsTrigger>
+          <TabsTrigger value="goals">Goals</TabsTrigger>
         </TabsList>
         <TabsContent value="today"><Today /></TabsContent>
         <TabsContent value="habits"><Habits /></TabsContent>
         <TabsContent value="once"><OneTime /></TabsContent>
+        <TabsContent value="shared"><SharedHub focus={params.get("q")} /></TabsContent>
         <TabsContent value="goals"><Goals /></TabsContent>
       </Tabs>
     </div>
@@ -61,6 +66,13 @@ function Ideas({ kind }: { kind: "daily" | "once" }) {
       ))}
     </div>
   );
+}
+
+/** Removing a shared copy leaves it (or, for the organiser, ends it for everyone); the button says which. */
+function sharedLabel(s: GameState, me: string, shareId: string | undefined, plain: string) {
+  const sq = shareId ? s.shares.find((x) => x.id === shareId) : undefined;
+  if (!sq || !isLive(sq) || sq.members[me]?.status !== "accepted") return plain;
+  return sq.createdBy === me ? "End for all" : "Leave";
 }
 
 function EditButton({ onClick, label }: { onClick: () => void; label: string }) {
@@ -103,14 +115,15 @@ function HabitRow({ h, week }: { h: Habit; week?: string[] }) {
         </div>
       )}
       <AuraChip value={h.xp} className="w-11 justify-end" />
+      <ShareButton type="habit" item={h} />
       <EditButton label={`Edit ${h.title}`} onClick={() => openSheet({ kind: "quest", preset: { edit: { type: "habit", id: h.id } } })} />
-      <DeleteButton onConfirm={() => act({ t: "habitRemove", habitId: h.id })} label="Retire" />
+      <DeleteButton onConfirm={() => act({ t: "habitRemove", habitId: h.id })} label={sharedLabel(s, me, h.shareId, "Retire")} />
     </div>
   );
 }
 
 function TodoRow({ x }: { x: Todo }) {
-  const { act, openSheet } = useGame();
+  const { s, me, act, openSheet } = useGame();
   return (
     <div className="flex min-h-[62px] items-center gap-3 px-3 py-2.5 sm:px-4">
       <CheckCircle done={x.done} onClick={() => act({ t: "todo", id: x.id })} label={`${x.done ? "Undo" : "Complete"} ${x.title}`} color={DIM[x.dim].color} />
@@ -125,8 +138,9 @@ function TodoRow({ x }: { x: Todo }) {
         </div>
       </div>
       <AuraChip value={x.xp} />
+      <ShareButton type="todo" item={x} />
       <EditButton label={`Edit ${x.title}`} onClick={() => openSheet({ kind: "quest", preset: { edit: { type: "todo", id: x.id } } })} />
-      <DeleteButton onConfirm={() => act({ t: "todoDel", id: x.id })} />
+      <DeleteButton onConfirm={() => act({ t: "todoDel", id: x.id })} label={sharedLabel(s, me, x.shareId, "Delete")} />
     </div>
   );
 }
@@ -187,7 +201,8 @@ function Habits() {
   const [showRetired, setShowRetired] = useState(false);
   const t = today();
   const habits = habitsFor(s, me);
-  const retired = s.habits.filter((h) => h.userId === me && h.archivedOn);
+  // retired habits, and shared habits whose end date has passed
+  const retired = s.habits.filter((h) => h.userId === me && (h.archivedOn || (h.endsOn && h.endsOn < t)));
   const week = Array.from({ length: 7 }, (_, i) => addDays(t, i - 6));
   if (!habits.length && !retired.length) {
     return (
@@ -212,7 +227,7 @@ function Habits() {
               {retired.map((h) => (
                 <div key={h.id} className="flex min-h-[56px] items-center gap-3 px-4 py-2.5">
                   <QuestGlyph icon={h.icon} dim={h.dim} size={30} />
-                  <div className="min-w-0 flex-1"><div className="truncate text-[15px] text-muted-foreground">{h.title}</div><div className="text-[12px] text-muted-foreground">Retired {fmtShort(h.archivedOn!)}</div></div>
+                  <div className="min-w-0 flex-1"><div className="truncate text-[15px] text-muted-foreground">{h.title}</div><div className="text-[12px] text-muted-foreground">{h.archivedOn ? `Retired ${fmtShort(h.archivedOn)}` : `Finished ${fmtShort(h.endsOn!)}`}</div></div>
                   <Button size="sm" variant="ghost" onClick={() => openSheet({ kind: "quest", preset: { kind: "daily", title: h.title, dim: h.dim, icon: h.icon, xp: h.xp } })}><RotateCcw />Start again</Button>
                 </div>
               ))}

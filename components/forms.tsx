@@ -1,14 +1,14 @@
 "use client";
 
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
-import { Camera, Check, Eye, EyeOff, Lock, Minus, Plus, X } from "lucide-react";
+import { Camera, Check, Eye, EyeOff, Lock, Minus, Plus, RotateCcw, UserPlus, Users, X } from "lucide-react";
 import {
   ACTIVE_DIMS, AURA_LIMITS, CHALLENGE_AURA, CHARACTERS, DIM, EFFORT, GOAL_SUGGESTIONS, MISSION_SUGGESTIONS, PRIVATE_BY_DEFAULT, QUEST_ICONS,
   QUEST_SUGGESTIONS, type QuestKind,
 } from "@/lib/catalog";
 import { newId, useGame, type GoalPreset, type QuestPreset } from "@/lib/store";
 import type { ActiveDim, Challenge, Habit } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, today } from "@/lib/utils";
 import { CharacterArt } from "./avatars";
 import { PhotoCropper } from "./cropper";
 import { AreaTag, AvatarView, QuestGlyph, SuggestionChip } from "./game";
@@ -97,6 +97,7 @@ function EffortPicker({ kind, value, onChange }: { kind: "daily" | "once"; value
 }
 
 const DAY_LETTERS = ["M", "T", "W", "T", "F", "S", "S"];
+const REMIND_HOURS = Array.from({ length: 18 }, (_, i) => i + 5);
 const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 function DaysPicker({ value, onChange }: { value?: number[]; onChange: (d?: number[]) => void }) {
   const on = (d: number) => !value || value.includes(d);
@@ -141,11 +142,17 @@ const KIND_COPY: Record<QuestKind, { label: string; placeholder: string; hint: s
 
 type MissionDraft = Pick<Challenge, "period" | "scope" | "track" | "target" | "unit" | "desc" | "participants">;
 
-export function QuestForm({ preset, onDone, allowChallenge = true, submitLabel }: { preset?: QuestPreset; onDone: (kind: QuestKind) => void; allowChallenge?: boolean; submitLabel?: string }) {
+/** What a submitted quest form made: its kind, and for a new habit or one-time quest, which one and whether to invite cousins next. */
+export interface QuestDone { kind: QuestKind; created?: { type: "habit" | "todo"; id: string }; invite?: boolean }
+
+export function QuestForm({ preset, onDone, allowChallenge = true, submitLabel, onInvite }: { preset?: QuestPreset; onDone: (r: QuestDone) => void; allowChallenge?: boolean; submitLabel?: string; onInvite?: (x: { source?: { type: "habit" | "todo"; id: string }; shareId?: string }) => void }) {
   const { s, me, act } = useGame();
   const editing = preset?.edit;
   const base = editing ? (editing.type === "habit" ? s.habits.find((h) => h.id === editing.id) : s.todos.find((x) => x.id === editing.id)) : undefined;
   const lockedAura = editing?.type === "todo" && !!(base as { done?: boolean } | undefined)?.done;
+  // a shared copy: only the organiser changes the quest itself; everyone changes their own reminder, visibility and goal
+  const share = base?.shareId ? s.shares.find((x) => x.id === base.shareId && !x.endedOn && (!x.endsOn || x.endsOn >= today()) && x.members[me]?.status === "accepted") : undefined;
+  const guest = !!share && share.createdBy !== me;
   const [kind, setKind] = useState<QuestKind>(editing ? (editing.type === "habit" ? "daily" : "once") : preset?.kind ?? "daily");
   const [title, setTitle] = useState(base?.title ?? preset?.title ?? "");
   const [dim, setDim] = useState<ActiveDim>(base?.dim ?? preset?.dim ?? "health");
@@ -156,6 +163,8 @@ export function QuestForm({ preset, onDone, allowChallenge = true, submitLabel }
   const [priv, setPriv] = useState<boolean>(base ? !!base.private : PRIVATE_BY_DEFAULT.includes(preset?.dim ?? "health"));
   const [privTouched, setPrivTouched] = useState(!!base);
   const [goalId, setGoalId] = useState(base?.goalId ?? preset?.goalId ?? "");
+  const [remindAt, setRemindAt] = useState<number | null>((base as Habit | undefined)?.remindAt ?? null);
+  const [invite, setInvite] = useState(!!preset?.invite);
   const [ch, setCh] = useState<MissionDraft>({ period: "weekly", scope: "team", track: "quests", target: 3, unit: "quests", desc: "", participants: [] });
   const goals = s.goals.filter((g) => g.userId === me && !g.done);
   const others = s.members.filter((m) => m.id !== me);
@@ -171,13 +180,14 @@ export function QuestForm({ preset, onDone, allowChallenge = true, submitLabel }
     const t = title.trim();
     if (!t) return;
     const q = { title: t, icon, dim, dim2, xp, goalId: goalId || undefined, private: priv };
+    const id = newId();
     let ok: boolean;
-    if (editing?.type === "habit") ok = act({ t: "habitEdit", id: editing.id, habit: { ...q, days } });
+    if (editing?.type === "habit") ok = act({ t: "habitEdit", id: editing.id, habit: { ...q, days, remindAt } });
     else if (editing?.type === "todo") ok = act({ t: "todoEdit", id: editing.id, todo: q });
-    else if (kind === "daily") ok = act({ t: "habitAdd", id: newId(), habit: { ...q, days } });
-    else if (kind === "once") ok = act({ t: "todoAdd", id: newId(), todo: q });
+    else if (kind === "daily") ok = act({ t: "habitAdd", id, habit: { ...q, days, remindAt } });
+    else if (kind === "once") ok = act({ t: "todoAdd", id, todo: q });
     else ok = act({ t: "chCreate", id: newId(), ch: { title: t, icon, dim, ...ch, scope: ch.participants.length ? ch.scope : "solo", unit: ch.track === "quests" ? ch.unit || "quests" : ch.unit } });
-    if (ok) onDone(kind);
+    if (ok) onDone(!editing && kind !== "challenge" ? { kind, created: { type: kind === "daily" ? "habit" : "todo", id }, invite } : { kind });
   };
 
   const ideas = kind === "challenge" ? [] : QUEST_SUGGESTIONS.filter((x) => x.kind === kind);
@@ -192,10 +202,19 @@ export function QuestForm({ preset, onDone, allowChallenge = true, submitLabel }
         </Tabs>
       )}
 
-      <div>
-        <input className="field h-12 text-[17px]" autoFocus={!editing} placeholder={copy.placeholder} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} aria-label="Name" />
-        <p className="mt-1.5 px-1 text-[12px] text-muted-foreground">{copy.hint}</p>
-      </div>
+      {share && (
+        <div className="flex items-start gap-2.5 rounded-2xl border border-primary/25 bg-primary/[.06] px-4 py-3 text-[13px]">
+          <Users className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <span>{guest ? <><span className="font-medium">Shared by {s.members.find((m) => m.id === share.createdBy)?.name ?? "a cousin"}.</span> <span className="text-muted-foreground">Only they can change the quest itself. Your reminder, visibility and goal are yours.</span></> : <><span className="font-medium">Shared quest.</span> <span className="text-muted-foreground">Changes to the name, dimension, Aura and schedule apply to everyone in it.</span></>}</span>
+        </div>
+      )}
+
+      {!guest && (
+        <div>
+          <input className="field h-12 text-[17px]" autoFocus={!editing} placeholder={copy.placeholder} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} aria-label="Name" />
+          <p className="mt-1.5 px-1 text-[12px] text-muted-foreground">{copy.hint}</p>
+        </div>
+      )}
 
       {!editing && (
         <div>
@@ -216,23 +235,31 @@ export function QuestForm({ preset, onDone, allowChallenge = true, submitLabel }
         </div>
       )}
 
-      <div>
+      {!guest && <div>
         <span className="label">Life dimension</span>
         <AreaPicker value={dim} onChange={(d) => d && pickDim(d)} />
-      </div>
-      {kind !== "challenge" && !lockedAura && (
+      </div>}
+      {kind !== "challenge" && !lockedAura && !guest && (
         <div>
           <span className="label">Also counts toward (optional)</span>
           <AreaPicker value={dim2} onChange={setDim2} exclude={dim} allowNone />
           {dim2 && <p className="mt-1.5 px-1 text-[12px] text-muted-foreground">Its Aura Points are split evenly: {Math.ceil(xp / 2)} to {DIM[dim].short}, {Math.floor(xp / 2)} to {DIM[dim2].short}.</p>}
         </div>
       )}
-      <div><span className="label">Icon</span><IconPicker value={icon} onChange={setIcon} dim={dim} /></div>
+      {!guest && <div><span className="label">Icon</span><IconPicker value={icon} onChange={setIcon} dim={dim} /></div>}
 
       {kind !== "challenge" ? (
         <div className="space-y-5">
-          {!lockedAura && <div><span className="label">Effort</span><EffortPicker kind={kind} value={xp} onChange={setXp} /></div>}
-          {kind === "daily" && <div><span className="label">Due on</span><DaysPicker value={days} onChange={setDays} /></div>}
+          {!lockedAura && !guest && <div><span className="label">Effort</span><EffortPicker kind={kind} value={xp} onChange={setXp} /></div>}
+          {kind === "daily" && !guest && <div><span className="label">Due on</span><DaysPicker value={days} onChange={setDays} /></div>}
+          {kind === "daily" && (
+            <Field label="Personal reminder (optional)" hint="Only for you, only if it's still open, and only if habit reminders are on in Profile, Notifications.">
+              <select className="field" value={remindAt ?? ""} onChange={(e) => setRemindAt(e.target.value === "" ? null : +e.target.value)}>
+                <option value="">No reminder</option>
+                {REMIND_HOURS.map((h) => <option key={h} value={h}>{new Date(2000, 0, 1, h).toLocaleTimeString("en-IN", { hour: "numeric" })}</option>)}
+              </select>
+            </Field>
+          )}
           {goals.length > 0 && !lockedAura && (
             <Field label="Supports a goal">
               <select className="field" value={goalId} onChange={(e) => setGoalId(e.target.value)}>
@@ -242,12 +269,24 @@ export function QuestForm({ preset, onDone, allowChallenge = true, submitLabel }
             </Field>
           )}
           <VisibilityRow value={priv} onChange={(v) => { setPriv(v); setPrivTouched(true); }} />
+          {!editing && others.length > 0 && onInvite && (
+            <label className="flex items-center justify-between gap-3 rounded-2xl bg-secondary/60 px-4 py-3">
+              <span className="flex items-start gap-2.5">
+                <UserPlus className="mt-0.5 h-4 w-4 text-primary" />
+                <span><span className="block text-[14px] font-medium">Invite cousins</span><span className="block text-[12px] text-muted-foreground">Pick who to invite next. It joins their quests only if they accept.</span></span>
+              </span>
+              <Switch checked={invite} onCheckedChange={setInvite} aria-label="Invite cousins after adding" />
+            </label>
+          )}
+          {editing && base && onInvite && !lockedAura && (
+            <Button type="button" variant="tinted" className="w-full" onClick={() => onInvite(share ? { shareId: share.id } : { source: { type: editing.type, id: editing.id } })}><UserPlus />{share ? "Invite more cousins" : "Invite cousins"}</Button>
+          )}
         </div>
       ) : (
         <MissionFields ch={ch} setCh={setCh} dim={dim} others={others} />
       )}
 
-      <Button type="submit" size="lg" className="w-full" disabled={!title.trim()}>{submitLabel ?? (editing ? "Save changes" : kind === "challenge" ? "Start mission" : "Add quest")}</Button>
+      <Button type="submit" size="lg" className="w-full" disabled={!title.trim()}>{submitLabel ?? (editing ? "Save changes" : kind === "challenge" ? "Start mission" : invite && onInvite ? "Add and invite" : "Add quest")}</Button>
     </form>
   );
 }
@@ -414,8 +453,9 @@ export function ProfileForm({ onSaved, submitLabel = "Save" }: { onSaved: () => 
 }
 
 /**
- * Choose a character (each belongs to one cousin) or upload a photo, which is
- * cropped first. Saves straight away.
+ * Choose one of the five characters (each belongs to one cousin) or upload a
+ * photo, which is cropped first. A photo shows instead of the character
+ * until it's removed. Saves straight away.
  */
 export function AvatarPicker({ compact }: { compact?: boolean }) {
   const { s, me, profile, updateProfile, toast } = useGame();
@@ -429,6 +469,11 @@ export function AvatarPicker({ compact }: { compact?: boolean }) {
     setBusy(null);
     if (err) toast(err, "warn");
   };
+  // back to a character: the one you had, or the first one nobody has claimed
+  const resetToDefault = () => {
+    const fallback = profile.character ?? CHARACTERS.find((c) => !holder(c.id))?.id;
+    save({ photo: null, ...(fallback && !profile.character ? { character: fallback } : {}) }, "photo");
+  };
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-4">
@@ -436,27 +481,29 @@ export function AvatarPicker({ compact }: { compact?: boolean }) {
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="secondary" onClick={() => input.current?.click()}><Camera />{profile.photo ? "Change photo" : "Upload a photo"}</Button>
-            {profile.photo && <Button type="button" size="sm" variant="ghost" disabled={busy === "photo"} onClick={() => save({ photo: null }, "photo")}><X />Remove photo</Button>}
+            {profile.photo && <Button type="button" size="sm" variant="ghost" disabled={busy === "photo"} onClick={resetToDefault}><RotateCcw />Reset to default avatar</Button>}
           </div>
-          <p className="text-[12px] text-muted-foreground">{profile.photo ? "Your photo shows instead of your character." : "Or pick a character below."}</p>
+          <p className="text-[12px] text-muted-foreground">{profile.photo ? "Your photo shows instead of your character. Resetting brings your character back; nothing else changes." : "Or pick one of the five characters below."}</p>
         </div>
         <input ref={input} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) setFile(f); }} />
       </div>
-      <div className={cn("grid gap-2.5", compact ? "grid-cols-4" : "grid-cols-2 sm:grid-cols-4")}>
+      <div className={cn("grid gap-2.5", compact ? "grid-cols-3 sm:grid-cols-5" : "grid-cols-2 sm:grid-cols-5")} role="radiogroup" aria-label="Characters">
         {CHARACTERS.map((c) => {
           const taken = holder(c.id);
           const mine = profile.character === c.id;
           return (
-            <button key={c.id} type="button" disabled={!!taken || busy !== null} aria-pressed={mine} onClick={() => !mine && save({ character: c.id }, c.id)}
-              className={cn("group relative overflow-hidden rounded-2xl border text-left transition disabled:cursor-not-allowed", mine ? "border-transparent ring-2" : "border-border hover:border-primary/40", taken && "opacity-45")}
-              style={mine ? { ["--tw-ring-color" as string]: c.color, boxShadow: `0 0 24px -6px ${c.color}` } : undefined}>
-              <CharacterArt id={c.id} size={160} className="aspect-square h-auto w-full transition duration-300 group-hover:scale-[1.03]" />
-              <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-2.5 pb-2 pt-6">
-                <span className="block font-display text-[14px] font-semibold text-white">{c.name}</span>
-                {!compact && <span className="block text-[11px] text-white/70">{taken ? `${taken.name}'s character` : c.title}</span>}
+            <button key={c.id} type="button" role="radio" disabled={!!taken || busy !== null} aria-checked={mine} onClick={() => !mine && save({ character: c.id }, c.id)}
+              className={cn("group relative flex flex-col overflow-hidden rounded-2xl border bg-card text-left transition disabled:cursor-not-allowed", mine ? "border-transparent ring-2" : "border-border hover:-translate-y-0.5 hover:shadow-card", taken && "opacity-50")}
+              style={mine ? { ["--tw-ring-color" as string]: c.color, boxShadow: `0 10px 28px -12px ${c.color}` } : undefined}>
+              <span className="relative block aspect-[4/5] overflow-hidden" style={{ background: c.deep }}>
+                <CharacterArt id={c.id} kind="portrait" className="h-full w-full transition duration-500 group-hover:scale-[1.04]" />
+                {mine && <span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full text-white shadow" style={{ background: c.color }}><Check className="h-3.5 w-3.5" strokeWidth={3} /></span>}
+                {taken && <span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white"><Lock className="h-3 w-3" /></span>}
               </span>
-              {mine && <span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full text-[#05070E]" style={{ background: c.color }}><Check className="h-3.5 w-3.5" strokeWidth={3} /></span>}
-              {taken && <span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white"><Lock className="h-3 w-3" /></span>}
+              <span className="block border-t-2 px-2.5 py-2" style={{ borderColor: c.color }}>
+                <span className="block truncate font-display text-[13px] font-semibold">{c.name}</span>
+                <span className="block truncate text-[11px] text-muted-foreground">{taken ? `${taken.name}'s character` : c.title}</span>
+              </span>
             </button>
           );
         })}

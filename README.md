@@ -63,6 +63,7 @@ Scores are shown for the last 7 days, 30 days and all time, with the previous pe
 
 - **Dashboard**: all five cousins side by side (Aura, level, rank, today and this week, streak, overall balance), today's mission (top three, habits due, daily objective, shared challenges), the live feed, and all ten dimensions compared cousin by cousin.
 - **Feed**: completions people chose to share, plus level-ups, badges, streak milestones and daily objectives. Cousins can react (no editing).
+- **Shared quests and habits**: invite cousins to any quest or habit (from the quest form, its edit sheet, or the cousins button on its row). Invitations wait in My Quests → Shared (received and sent) and under the bell; nothing joins anyone's quests until they accept. *Together*: everyone does it independently with their own copy, streak, Aura, Life Balance and reminder time, shown side by side (completions, consistency, streaks, Aura, recent completions with positive reactions, and highlights like most consistent or most improved). *Team goal*: everyone's completions add up toward one target before a deadline; an optional team bonus (fixed when it's created: 50, 75 or 100 Aura by length) is paid once to each cousin who contributed. Only the organiser changes the quest itself or ends it (everyone keeps their copy and history); anyone else can leave, keeping what they earned. When everyone completes a shared habit on the same day, the participants get a group moment in the feed. Inviting, accepting and declining never award Aura.
 - **Rivalries**: optional weekly races (most Aura, most active days, or most Aura in one dimension). Winners get a trophy and a badge, not extra Aura.
 - **Missions**: a target with a deadline. *Team*: everyone must hit their own target, then everyone earns the reward. *Shared*: one total. *Race*: each for themselves. Progress is counted automatically from completed quests in the mission's dimension, or logged by hand.
 - **Weekly recap** (`/recap`): last week's Aura, quests, strongest and weakest dimensions, change against the week before, and the squad's big moments. It can be shared as an image.
@@ -70,16 +71,19 @@ Scores are shown for the last 7 days, 30 days and all time, with the previous pe
 ## Privacy and permissions
 
 - Every action goes through the reducer as the signed-in cousin (`lib/reducer.ts`), which only lets you change your own quests, goals, progress and reactions. Profile changes only ever touch the caller. Tests in `tests/` try to break this.
+- Shared quests, their invitations and their feed moments go only to the cousins invited to them. Participants see each other's progress on that quest (from the ledger's claim refs), never each other's other habits. A shared quest's copies start with the organiser's visibility choice, so a private one stays untitled for everyone outside it.
 - Each cousin's view is filtered on the server (`lib/server/view.ts`). Shared: profiles, Aura totals, achievements, shared goals, challenges, rivalries, meetups, the feed, and **aggregated** Life Balance scores. Only sent to the owner: habits and one-time quests, private goals, today's priorities, notes, money amounts (money goals show cousins a percentage), phone numbers, and anything personal from earlier versions.
 - Quests, goals and activities can be private. Cousins then see the Aura and dimension (which their totals are made of), never the title. Emotional and financial items start out private. A "Share my activity" switch hides all completions.
 
 ## Notifications
 
-In-app notifications (the bell) always work. WhatsApp and browser push are **off until each cousin opts in** (Profile → Alerts), and both need credentials on the server. Without them, the app records messages as clearly labelled **simulations**, so cousins can preview what they'd get, and never claims anything was sent.
+In-app notifications (the bell, with an unread count, the cousin's avatar, a link to what it's about, and Accept/Decline right on invitations) always work. WhatsApp and browser push are **off until each cousin opts in** (Profile → Notifications), and both need credentials on the server. Without them, the app records messages as clearly labelled **simulations**, so cousins can preview what they'd get, and never claims anything was sent.
 
 How it works (`lib/server/notify.ts`): messages go into an outbox stored with the data, one per event per channel, deduplicated by key. Each cousin's quiet hours delay messages, and their daily limit (1–5) drops extras as "skipped". Delivery happens on the server, claimed with a write so two instances never send the same message, and is retried on temporary errors. The status moves through queued → sending → sent → delivered/read, or failed with the reason. Messages carry only what the recipient may know.
 
-Kinds: daily reminder (only if quests are left), a cousin passing your weekly Aura, a challenge or mission completed, a group challenge ending tomorrow, and the weekly recap.
+Categories, each switchable: habit reminders (at the cousin's chosen time, plus optional per-habit reminder times), quest reminders (open one-time quests), invitation alerts, cousin activity (streak milestones, level-ups, achievements, accepted invitations, completed missions; off by default), leaderboard updates (being overtaken, reaching the top three; once a week each), missions and team quests, the weekly summary (Aura, quests, consistency, biggest Life Balance gain and place), and meetups. Times are India time.
+
+Push delivery is honest: "sent" means the push service accepted it; it becomes "delivered" only when the service worker on a device confirms it showed the notification (`/api/notify/receipt`). Profile → Notifications has a "Send test notification" button that reports which of the two happened.
 
 ### WhatsApp (Meta WhatsApp Business Platform, Cloud API)
 
@@ -94,7 +98,13 @@ Kinds: daily reminder (only if quests are left), a cousin passing your weekly Au
    | `tna_challenge_done` | Utility | `You've completed {{1}}! +{{2}} Aura Points.` |
    | `tna_challenge_ending` | Utility | `The group challenge {{1}} ends tomorrow.` |
    | `tna_weekly_recap` | Utility | `Your weekly Life Balance recap is ready, {{1}}.` |
+   | `tna_habit_reminder` | Utility | `Your {{1}} habit is still waiting. Complete it to earn {{2}} Aura.` |
+   | `tna_quest_reminder` | Utility | `{{2}} one-time quests are still open, {{1}}. Knock one off today.` |
+   | `tna_top_three` | Utility | `You've reached the top three this week, {{1}}.` |
+   | `tna_invite` | Utility | `{{1}} invited you to “{{2}}”. Want to join?` |
    | `tna_test` | Utility | `This is a test from Thunderstorms 'n' All. Your notifications are set up.` |
+
+   Messages without a template (for example "a cousin joined your quest") go to push only.
 
    Adding "Reply STOP to unsubscribe." to each body is a good idea; replying STOP turns WhatsApp off for that cousin.
 3. Set `WHATSAPP_ACCESS_TOKEN` (a permanent system-user token) and `WHATSAPP_PHONE_NUMBER_ID`.
@@ -104,11 +114,13 @@ Cousins then add their number (+91 by default), confirm the six-digit code sent 
 
 ### Browser push and installing the app
 
-The site is a PWA: it can be installed to the home screen (Profile → Settings → Install). On iPhone, push works only after installing it. To turn on push, generate keys with `npx web-push generate-vapid-keys` and set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` (`mailto:you@example.com`).
+The site is a PWA ("Project – Thunderstorms ’n’ All", short name "Thunderstorms"): it can be installed to the home screen (Profile → Notifications, or Settings → Install app, on Android and desktop). On iPhone (iOS 16.4+), push works only from the Home Screen app; Profile → Notifications shows the five steps. Permission is never requested on page load, only from the "Enable notifications" button.
+
+To turn on push, generate keys with `npx web-push generate-vapid-keys` and set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` (`mailto:you@example.com`) in Vercel, then redeploy. The private key stays on the server.
 
 ### Scheduled reminders
 
-Reminders are checked while cousins use the app (at most every 10 minutes), and once a day by Vercel Cron (`vercel.json`, 09:00 India time). Set `CRON_SECRET` in Vercel to enable the cron route; without it, the route stays off.
+Reminders are checked while cousins use the app (at most every 10 minutes), once a day by Vercel Cron (`vercel.json`, 09:00 India time), and every 15 minutes by a GitHub Actions workflow (`.github/workflows/reminders.yml`), so timed reminders go out with the app closed. Set the same random `CRON_SECRET` in Vercel and as a GitHub repository secret (Settings → Secrets and variables → Actions). Without it the route and the workflow stay off. GitHub pauses scheduled workflows in repositories with no activity for 60 days; re-enable it from the Actions tab if that happens.
 
 ## Hosting
 
@@ -137,6 +149,7 @@ The game day runs on India time (UTC+5:30) wherever the server runs, so a habit 
 - Schema changes are numbered migrations in `lib/server/migrations.ts`. Normal startup and redeploys never reset data.
   - Migration 2 removed demo content; migration 3 added password reset links.
   - **Migration 4** (Aura Points and ten dimensions) maps the old twelve life areas onto the new dimensions (Mind → Intellectual, Money → Financial, Family and Friends → Social, Creativity and Adventure → Quality of Life, Giving → Character, Inner Calm → Spiritual; items filed under Vision move to Character, because Life Vision is now calculated). It marks history that used to be personal (one-time quests, savings, health logs, mood and reviews, slip-ups) as private, turns duels into rivalries, maps emoji icons to line icons, sets each goal's high-water mark, and starts the feed from the last two weeks of shareable completions. It deletes nothing: retired data such as health logs, mood, reviews, savings, interests and self-ratings stays stored, just no longer shown.
+  - **Migration 6** (character portraits, shared quests, notification categories) is additive: it adds the empty list of shared quests; moves each cousin from a retired drawn character to the portrait closest in colour (still one per cousin), giving cousins with neither a character nor a photo a free portrait (photos are never touched); and maps the old notification kinds onto the new categories (daily → habit and quest reminders, overtaken → leaderboard, challenge done/ending → missions). No quests, logs or goals change.
   - **Migration 5** (2026-10-19, at the owner's request) is a one-time fresh start: it clears every cousin's activity (quests, goals, history, feed, achievements, notifications and all retired data) and keeps every account: login, name, photo, character, bio, roles, phone and notification settings, sessions and invitations. It runs once, after a `pre-migration-v4-*` backup that holds the old data.
 - If the stored data can't be parsed, the server refuses to continue rather than overwrite it. `data/` is git-ignored; never commit it.
 
@@ -153,7 +166,7 @@ The game day runs on India time (UTC+5:30) wherever the server runs, so a habit 
 | `/welcome`, `/signup`, `/login`, `/forgot`, `/reset` | Welcome, account creation, sign-in, password recovery |
 | `/onboarding` | Identity → avatar → goals → first quest |
 | `/` | Dashboard: the five cousins, today's mission, live feed, ten-dimension comparison, squad pulse |
-| `/quests` | My Quests: today, habits (with retired ones), one-time quests, goals |
+| `/quests` | My Quests: today, habits (with retired ones), one-time quests, shared (invitations received and sent, shared quests), goals |
 | `/life` | Life Balance: storm wheel, radar, every dimension with what fed it, trend, how it's calculated |
 | `/arena` | Leaderboard, rivalries, missions, and Together (meetups and memories) |
 | `/profile` | Identity, rank, frames, achievements, Aura history, alerts, settings |
@@ -164,7 +177,9 @@ Old routes (`/goals`, `/league`, `/bonding`, `/settings`, `/health`, `/career`, 
 
 ## Design
 
-A dark, cinematic storm refined like Apple hardware: midnight navy and graphite surfaces, electric blue for actions, lightning violet and cool cyan for energy, and warm amber reserved for achievements. Each dimension has its own restrained accent colour. The display face is Space Grotesk, with Inter for body text. Characters, rank emblems and frames are original SVG artwork (`components/avatars.tsx`). Motion: occasional faint lightning behind the clouds, an electric charge on the Aura counter, sparks when you check something off, drawn lightning on level-ups, and slowly turning electric borders on rare achievements. Everything decorative respects `prefers-reduced-motion` and can be switched off per device (Profile → Settings), along with sound. Light mode remains available.
+An Apple-refined productivity dashboard inside a fantasy storm. Light is the default: white and off-white surfaces, light blue and lavender air, pastel storm clouds over distant spires (`SkyScene` in `components/brand.tsx`), electric blue for actions, violet, teal and gold highlights (gold for achievements). Dark mode keeps the same structure on midnight navy. Each dimension has its own accent colour. The display face is Space Grotesk, with Inter for body text.
+
+Characters are the squad's own artwork: five portraits (Electric Blue, Magenta, Aquamarine, Golden Radiance, Deep Violet) cut from the supplied image into three WebP crops each in `public/avatars/` (`avatar-*` square face for round avatars, `portrait-*` 4:5 for cards, `full-*` the whole panel). Each cousin picks one (one per cousin) or uploads a cropped photo; "Reset to default avatar" brings the character back. A character's colour themes the cousin's avatar ring, Aura counter, level badge, profile header and celebrations. Rank emblems and frames are SVG (`components/avatars.tsx`). Motion: occasional faint lightning behind the clouds, an electric charge on the Aura counter, sparks when you check something off, drawn lightning on level-ups, and slowly turning electric borders on rare achievements. Everything decorative respects `prefers-reduced-motion` and can be switched off per device (Profile → Settings), along with sound. Light mode remains available.
 
 ## Code map
 

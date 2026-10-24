@@ -12,9 +12,9 @@ function apply(pref: ThemePref) {
 
 /** Appearance is a per-device preference, so it lives in this browser only. */
 export function useTheme() {
-  const [pref, setPref] = useState<ThemePref>("dark");
+  const [pref, setPref] = useState<ThemePref>("light");
   useEffect(() => {
-    try { setPref((localStorage.getItem(KEY) as ThemePref) || "dark"); } catch { /* storage blocked */ }
+    try { setPref((localStorage.getItem(KEY) as ThemePref) || "light"); } catch { /* storage blocked */ }
   }, []);
   useEffect(() => {
     if (pref !== "system") return;
@@ -36,8 +36,8 @@ export function ThemeWatcher() {
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const on = () => {
-      let p: ThemePref = "dark";
-      try { p = (localStorage.getItem(KEY) as ThemePref) || "dark"; } catch { /* storage blocked */ }
+      let p: ThemePref = "light";
+      try { p = (localStorage.getItem(KEY) as ThemePref) || "light"; } catch { /* storage blocked */ }
       if (p === "system") apply("system");
     };
     mq.addEventListener("change", on);

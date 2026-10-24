@@ -1,4 +1,5 @@
-import type { NotifyKind, NotifyPrefs, OutboxItem } from "../types";
+import { NOTIFY_KINDS, NOTIFY_OFF_BY_DEFAULT } from "../catalog";
+import type { NotifyCategory, NotifyPrefs, OutboxItem } from "../types";
 import { indiaHour, msUntilIndiaHour, today, uid } from "../utils";
 import { readDb, writeDb, type DB, type UserRecord } from "./db";
 import { pushConfig, pushReady, sendPush } from "./push";
@@ -17,16 +18,23 @@ import { sendTemplate, whatsappReady } from "./whatsapp";
  *   as "simulated" so they can preview them. They are never marked sent.
  */
 
+export const defaultKinds = () => Object.fromEntries(NOTIFY_KINDS.map((k) => [k.id, !NOTIFY_OFF_BY_DEFAULT.includes(k.id)])) as Record<NotifyCategory, boolean>;
 export const defaultPrefs = (): NotifyPrefs => ({
   whatsapp: false,
   push: false,
-  kinds: { daily: true, overtaken: true, challengeDone: true, ending: true, recap: true },
+  kinds: defaultKinds(),
   quietStart: 22,
   quietEnd: 8,
   dailyLimit: 3,
   reminderHour: 9,
 });
-export const prefsOf = (u: UserRecord): NotifyPrefs => ({ ...defaultPrefs(), ...u.notify, kinds: { ...defaultPrefs().kinds, ...u.notify?.kinds } });
+/** A cousin's settings with defaults filled in. Only the current categories are kept. */
+export function prefsOf(u: UserRecord): NotifyPrefs {
+  const stored = (u.notify?.kinds ?? {}) as Partial<Record<string, boolean>>;
+  const kinds = defaultKinds();
+  for (const k of Object.keys(kinds) as NotifyCategory[]) if (typeof stored[k] === "boolean") kinds[k] = stored[k]!;
+  return { ...defaultPrefs(), ...u.notify, kinds };
+}
 
 /** Whether this cousin has any channel that could receive a message. */
 export function reachable(u: UserRecord): boolean {
@@ -45,8 +53,10 @@ function inQuiet(h: number, start: number, end: number) {
 }
 
 export interface Message {
-  kind: NotifyKind;
+  kind: NotifyCategory | "test";
   dedupe: string;
+  /** the notification's headline on a phone; defaults to the app name */
+  title?: string;
   body: string;
   url?: string;
   template?: { name: string; params: string[] };
@@ -61,7 +71,8 @@ export function enqueue(db: DB, userId: string, msg: Message, now = Date.now()):
   db.outbox ??= [];
 
   const channels: { channel: OutboxItem["channel"]; status: OutboxItem["status"]; error?: string }[] = [];
-  if (p.whatsapp && p.phone) {
+  // WhatsApp only carries approved templates; messages without one go to push only
+  if (p.whatsapp && p.phone && msg.template) {
     if (!whatsappReady()) channels.push({ channel: "whatsapp", status: "simulated" });
     else if (p.phoneVerified) channels.push({ channel: "whatsapp", status: "queued" });
   }
@@ -80,7 +91,7 @@ export function enqueue(db: DB, userId: string, msg: Message, now = Date.now()):
     if (db.outbox.some((o) => o.userId === userId && o.dedupe === msg.dedupe && o.channel === c.channel && o.createdAt > recent)) continue;
     const item: OutboxItem = {
       id: uid() + uid().slice(0, 4), userId, kind: msg.kind, channel: c.channel, dedupe: msg.dedupe, createdAt: now, notBefore, updatedAt: now,
-      status: overLimit ? "skipped" : c.status, attempts: 0, body: msg.body, url: msg.url, template: msg.template,
+      status: overLimit ? "skipped" : c.status, attempts: 0, title: msg.title, body: msg.body, url: msg.url, template: msg.template,
       ...(overLimit ? { error: `Daily limit of ${p.dailyLimit} reached` } : quiet && c.status === "queued" ? { error: "Waiting for quiet hours to end" } : {}),
     };
     db.outbox.push(item);
@@ -140,7 +151,8 @@ export async function processOutbox(now = Date.now()): Promise<number> {
     const gone: string[] = [];
     let ok = false, error: string | undefined, retry = false;
     for (const sub of subs ?? []) {
-      const r = await sendPush(sub, { title: "Thunderstorms 'n' All", body: item.body, url: item.url ?? "/", tag: item.kind });
+      // the id lets the service worker confirm the notification was actually shown (see /api/notify/receipt)
+      const r = await sendPush(sub, { id: item.id, title: item.title ?? "Thunderstorms 'n' All", body: item.body, url: item.url ?? "/", tag: item.dedupe.slice(0, 60) });
       if (r.ok) ok = true;
       else { if (r.gone) gone.push(sub.endpoint); error = r.error; retry ||= !!r.retry; }
     }

@@ -38,9 +38,9 @@ export function Appearance() {
     <Section title="Appearance and feel">
       <List>
         <ListRow className="flex-col items-stretch gap-3 py-3.5 sm:flex-row sm:items-center sm:justify-between">
-          <div><div className="text-[15px] font-medium">Theme</div><div className="text-[13px] text-muted-foreground">Dark is the full storm. Saved on this device.</div></div>
+          <div><div className="text-[15px] font-medium">Theme</div><div className="text-[13px] text-muted-foreground">Light is the default; dark is the full storm. Saved on this device.</div></div>
           <Tabs value={pref} onValueChange={(v) => set(v as ThemePref)}>
-            <TabsList className="flex w-full sm:w-auto"><TabsTrigger value="dark">Dark</TabsTrigger><TabsTrigger value="light">Light</TabsTrigger><TabsTrigger value="system">Automatic</TabsTrigger></TabsList>
+            <TabsList className="flex w-full sm:w-auto"><TabsTrigger value="light">Light</TabsTrigger><TabsTrigger value="dark">Dark</TabsTrigger><TabsTrigger value="system">Automatic</TabsTrigger></TabsList>
           </Tabs>
         </ListRow>
         <ListRow>

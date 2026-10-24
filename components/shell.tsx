@@ -1,20 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Bell, Check, Compass, LayoutDashboard, ListChecks, Plus, Swords, Target, TrendingUp, UserRound, Zap, type LucideIcon } from "lucide-react";
 import { ACTIVITIES, DIM, MEETUP_KINDS, MEMORY_ICONS, PLACES, PRIVATE_ACTIVITIES, RIVALRY_TEMPLATES } from "@/lib/catalog";
 import { newId, useGame, type Sheet } from "@/lib/store";
-import type { ActiveDim, Rivalry } from "@/lib/types";
+import { isLive } from "@/lib/shared";
+import type { ActiveDim, Notif, Rivalry } from "@/lib/types";
 import { cn, timeAgo, today } from "@/lib/utils";
 import { AuraIcon, LightningFlash, LightningStreaks, LogoMark, StormBackdrop, Wordmark } from "./brand";
 import { AreaPicker, Field, GoalForm, QuestForm, VisibilityRow } from "./forms";
-import { AuraCounter, AvatarView, RankBadge, useLevel } from "./game";
+import { AuraCounter, AvatarView, RankBadge, memberColor, useLevel } from "./game";
 import { BADGE_ICON, NOTIF_ICON, QUEST_ICON } from "./icons";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Progress } from "./ui/progress";
+import { InviteSheet, ShareSheet } from "./share";
 
 interface NavItem { href: string; label: string; short: string; icon: LucideIcon; match: (p: string) => boolean }
 export const NAV: NavItem[] = [
@@ -61,7 +63,7 @@ function Sidebar() {
           <span className="text-muted-foreground">Level {L.level} · {L.title}</span>
           <span className="tabular-nums text-muted-foreground">{L.span - L.into} to go</span>
         </div>
-        <Progress value={L.pct * 100} className="mt-1.5 h-1.5" />
+        <Progress value={L.pct * 100} className="mt-1.5 h-1.5" color={memberColor(profile)} />
       </Link>
     </aside>
   );
@@ -84,39 +86,70 @@ function usePopover() {
 
 const popoverPanel = "absolute right-0 z-50 mt-2 origin-top-right overflow-hidden rounded-[18px] border border-border bg-popover shadow-float motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-[.97]";
 
+/** The notification centre: what happened, who it was, and a tap to go there. Invitations can be answered right here. */
 function Notifications() {
   const { s, me, act } = useGame();
+  const router = useRouter();
   const { open, setOpen, ref } = usePopover();
   const seen = s.notifsSeen[me] ?? 0;
   const unread = s.notifs.filter((n) => n.ts > seen).length;
+  const go = (link?: string) => { if (!link) return; setOpen(false); router.push(link); };
   return (
     <div className="relative" ref={ref}>
-      <Button variant="ghost" size="icon" aria-label={unread ? `Notifications, ${unread} new` : "Notifications"} aria-expanded={open}
-        onClick={() => { setOpen(!open); if (!open && unread) setTimeout(() => act({ t: "notifsRead" }), 1200); }}>
+      <Button variant="ghost" size="icon" aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"} aria-expanded={open}
+        onClick={() => { setOpen(!open); if (!open && unread) setTimeout(() => act({ t: "notifsRead" }), 2500); }}>
         <Bell />
-        {unread > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary))] ring-2 ring-background" />}
+        {unread > 0 && <span className="absolute right-1 top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary px-1 text-[10px] font-bold tabular-nums text-primary-foreground ring-2 ring-background">{unread > 9 ? "9+" : unread}</span>}
       </Button>
       {open && (
-        <div className={cn(popoverPanel, "max-h-[70dvh] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto p-2")}>
-          <div className="flex items-center justify-between px-3 pb-1 pt-2">
+        <div className={cn(popoverPanel, "max-h-[75dvh] w-[min(24rem,calc(100vw-2rem))] overflow-y-auto p-2")}>
+          <div className="flex items-center justify-between gap-2 px-3 pb-1 pt-2">
             <span className="font-display text-[15px] font-semibold">Notifications</span>
-            <Link href="/profile?tab=alerts" onClick={() => setOpen(false)} className="text-[12px] text-primary hover:opacity-80">Settings</Link>
+            <span className="flex items-center gap-3">
+              {unread > 0 && <button type="button" onClick={() => act({ t: "notifsRead" })} className="text-[12px] text-muted-foreground hover:text-foreground">Mark all read</button>}
+              <Link href="/profile?tab=alerts" onClick={() => setOpen(false)} className="text-[12px] text-primary hover:opacity-80">Settings</Link>
+            </span>
           </div>
-          {s.notifs.length === 0 && <p className="px-3 pb-4 pt-1 text-[14px] text-muted-foreground">All calm. Invitations, reactions and rivalries will show up here.</p>}
-          {s.notifs.slice(0, 25).map((n) => {
-            const Icon = NOTIF_ICON[n.icon] ?? Zap;
-            return (
-              <div key={n.id} className="flex gap-3 rounded-xl px-3 py-2.5">
-                <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary"><Icon className="h-4 w-4" /></span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[14px] font-medium leading-snug">{n.title}</div>
-                  {n.body && <div className="text-[13px] text-muted-foreground">{n.body}</div>}
-                  <div className="mt-0.5 text-[11px] text-muted-foreground/80">{timeAgo(n.ts)}</div>
-                </div>
-                {n.ts > seen && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" />}
-              </div>
-            );
-          })}
+          {s.notifs.length === 0 && <p className="px-3 pb-4 pt-1 text-[14px] text-muted-foreground">All calm. Invitations, reactions, rivalries and milestones will show up here.</p>}
+          {s.notifs.slice(0, 30).map((n) => <NotifRow key={n.id} n={n} unread={n.ts > seen} onGo={go} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NotifRow({ n, unread, onGo }: { n: Notif; unread: boolean; onGo: (link?: string) => void }) {
+  const { s, me, act } = useGame();
+  const Icon = NOTIF_ICON[n.icon] ?? Zap;
+  const from = n.from ? s.members.find((m) => m.id === n.from) : undefined;
+  const sq = n.ref?.startsWith("share:") ? s.shares.find((x) => x.id === n.ref!.slice(6)) : undefined;
+  const answerable = !!sq && sq.members[me]?.status === "pending" && isLive(sq);
+  const body = (
+    <>
+      <span className="relative mt-0.5 shrink-0">
+        {from ? <AvatarView member={from} size={36} frame={false} /> : <span className="grid h-9 w-9 place-items-center rounded-full bg-primary/10 text-primary"><Icon className="h-4 w-4" /></span>}
+        {from && <span className="absolute -bottom-1 -right-1 grid h-[18px] w-[18px] place-items-center rounded-full bg-primary text-primary-foreground ring-2 ring-popover"><Icon className="h-2.5 w-2.5" strokeWidth={2.6} /></span>}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className={cn("block text-[14px] leading-snug", unread ? "font-semibold" : "font-medium")}>{n.title}</span>
+        {n.body && <span className="block text-[13px] text-muted-foreground">{n.body}</span>}
+        <span className="mt-0.5 block text-[11px] text-muted-foreground/80">{timeAgo(n.ts)}</span>
+      </span>
+      {unread && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />}
+    </>
+  );
+  return (
+    <div className={cn("rounded-xl", unread && "bg-primary/[.05]")}>
+      {n.link ? (
+        <button type="button" onClick={() => onGo(n.link)} className="flex w-full gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-secondary/70">{body}</button>
+      ) : (
+        <div className="flex gap-3 px-3 py-2.5">{body}</div>
+      )}
+      {answerable && (
+        <div className="flex gap-2 px-3 pb-3 pl-[60px]">
+          <Button size="sm" onClick={() => act({ t: "shareRespond", id: sq!.id, accept: true, copyId: newId() })}><Check />Accept</Button>
+          <Button size="sm" variant="secondary" onClick={() => act({ t: "shareRespond", id: sq!.id, accept: false })}>Decline</Button>
+          <Button size="sm" variant="ghost" onClick={() => onGo(n.link)}>Details</Button>
         </div>
       )}
     </div>
@@ -150,14 +183,16 @@ function NewMenu() {
 }
 
 function TopBar() {
-  const { me } = useGame();
+  const { me, profile } = useGame();
   const L = useLevel(me);
+  const tone = memberColor(profile);
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/75 backdrop-blur-xl backdrop-saturate-150">
       <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between gap-3 px-4 sm:px-6 lg:justify-end lg:px-10">
         <Link href="/" className="flex items-center gap-2 lg:hidden"><LogoMark size={28} /><Wordmark className="hidden text-[14px] min-[380px]:inline" /></Link>
         <div className="flex items-center gap-1.5">
-          <Link href="/profile?tab=history" className="mr-1 flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/[.07] px-3 py-1.5 text-[14px] font-semibold text-foreground transition hover:border-primary/50" aria-label="Your Aura Points">
+          <Link href="/profile?tab=history" className="mr-1 flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[14px] font-semibold text-foreground transition hover:brightness-105" aria-label="Your Aura Points"
+            style={{ borderColor: `${tone}55`, background: `${tone}12`, color: tone }}>
             <AuraCounter value={L.aura} className="font-display" />
             <span className="hidden text-[12px] font-normal text-muted-foreground sm:inline">Aura</span>
           </Link>
@@ -210,7 +245,8 @@ export function Toasts() {
 
 /** Milestones: a dark sky, a flash, and for level-ups, lightning drawing itself across the screen. */
 function Celebration() {
-  const { celebration: c, dismissCelebration } = useGame();
+  const { celebration: c, dismissCelebration, profile } = useGame();
+  const tone = memberColor(profile);
   useEffect(() => {
     if (!c) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" || e.key === "Enter") dismissCelebration(); };
@@ -224,7 +260,7 @@ function Celebration() {
       <LightningFlash />
       {c.kind === "level" && <LightningStreaks />}
       <div className="relative w-full max-w-sm text-center motion-safe:animate-fade-up" onClick={(e) => e.stopPropagation()}>
-        <div className={cn("electric mx-auto grid h-28 w-28 place-items-center rounded-full bg-white/[.06]", c.kind === "badge" && "electric-gold")}>
+        <div className={cn("electric mx-auto grid h-28 w-28 place-items-center rounded-full bg-white/[.06]", c.kind === "badge" && "electric-gold")} style={{ boxShadow: `0 0 60px -10px ${tone}` }}>
           <Icon className={cn("h-12 w-12", c.kind === "level" ? "text-[hsl(var(--ion))]" : "text-accent")} strokeWidth={1.7} />
         </div>
         <div className="eyebrow mt-7 text-white/60">{c.kind === "level" ? "Level up" : "Achievement unlocked"}</div>
@@ -408,6 +444,11 @@ function GlobalSheets() {
   const close = (v: boolean) => { if (!v) openSheet(null); };
   const editing = sheet?.kind === "quest" && sheet.preset?.edit;
   const editingGoal = sheet?.kind === "goal" && sheet.preset?.edit;
+  const [last, setLast] = useState<Sheet | null>(null);
+  // keep the last invite/share sheet's details while it animates closed
+  useEffect(() => { if (sheet?.kind === "invite" || sheet?.kind === "share") setLast(sheet); }, [sheet]);
+  const inv = sheet?.kind === "invite" ? sheet : last?.kind === "invite" ? last : null;
+  const shr = sheet?.kind === "share" ? sheet : last?.kind === "share" ? last : null;
   return (
     <>
       <Dialog open={sheet?.kind === "quest"} onOpenChange={close}>
@@ -416,7 +457,15 @@ function GlobalSheets() {
             <DialogTitle>{editing ? "Edit quest" : "New quest"}</DialogTitle>
             <DialogDescription>{editing ? "Changes apply from now on. Aura already earned stays as it was." : "Small, specific and doable beats big and vague."}</DialogDescription>
           </DialogHeader>
-          {sheet?.kind === "quest" && <QuestForm key={JSON.stringify(sheet.preset ?? {})} preset={sheet.preset} onDone={(k) => { openSheet(null); toast(editing ? "Saved" : k === "challenge" ? "Mission started" : "Quest added", "info"); }} />}
+          {sheet?.kind === "quest" && (
+            <QuestForm key={JSON.stringify(sheet.preset ?? {})} preset={sheet.preset}
+              onInvite={(x) => openSheet({ kind: "invite", ...x })}
+              onDone={(r) => {
+                if (r.invite && r.created) { openSheet({ kind: "invite", source: r.created }); return; }
+                openSheet(null);
+                toast(editing ? "Saved" : r.kind === "challenge" ? "Mission started" : "Quest added", "info");
+              }} />
+          )}
         </DialogContent>
       </Dialog>
       <Dialog open={sheet?.kind === "goal"} onOpenChange={close}>
@@ -428,6 +477,8 @@ function GlobalSheets() {
       <LogSheet open={sheet?.kind === "log"} onOpenChange={close} />
       <RivalrySheet open={sheet?.kind === "rivalry"} onOpenChange={close} />
       <MeetupSheet open={sheet?.kind === "meetup"} onOpenChange={close} />
+      <InviteSheet open={sheet?.kind === "invite"} onOpenChange={close} source={inv?.source} shareId={inv?.shareId} />
+      <ShareSheet open={sheet?.kind === "share"} onOpenChange={close} id={shr?.id} />
     </>
   );
 }

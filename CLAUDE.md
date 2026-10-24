@@ -25,6 +25,10 @@ A private life-gamification web app for five cousins (Hyderabad and Bangalore, i
 1. **First brief** ("website redesign and functional improvements", cut off in section 3): Apple-inspired redesign, real accounts and onboarding, no pre-populated content. Done in earlier sessions.
 2. **Second brief** (2026-10-19, "major product evolution", 11 sections plus acceptance criteria): Aura Points; ten automatic Life Balance dimensions; a shared five-cousin dashboard with per-dimension comparisons; original character avatars and photo cropping; a premium dark thunderstorm UI; removing Interests, Reflect and Daily Spark and simplifying navigation to Dashboard, My Quests, Life Balance, Arena, Profile; engagement features (mission center, feed with reactions, rivalries, collaborative missions, recoverable streaks, achievements, weekly recap); phone and WhatsApp notifications through the official platform with consent, limits, quiet hours, dedupe and honest simulation; PWA and push; secure ownership; data preserved through migrations. Built on `aura-evolution`.
 
+## Third brief (2026-10-24, "Updates 1–4" PDF), built on branch `storm-updates`
+
+Real push (VAPID still to be set by the owner), a light-mode refinement, the five portrait characters, and inviting cousins to any quest or habit. Key pieces: `lib/shared.ts` (shared-quest progress, highlights, `canSeeEvent`), reducer actions `shareCreate`/`shareInvite`/`shareRespond`/`shareLeave`/`shareEnd` plus `syncShares` (team bonus refs `sq:<id>`, feed refs `sqall:`/`sqdone:`), `components/share.tsx` (invite sheet, participant panel, inbox), `app/api/notify/receipt` (service-worker delivery receipts), `.github/workflows/reminders.yml` (15-minute schedule), migration 6. Decisions (reversible): light is the default theme again (the brief says not to replace light with dark); characters stay one per cousin; copies of a shared quest start with the organiser's visibility; only the organiser edits or ends a shared quest, ending keeps everyone's copy; team bonus is 50/75/100 by length and must be switched on at creation; meetups are recorded after they happen, so "meetup reminders" means "a cousin logged a meetup with you". Cousin-activity pushes are off by default. Character images are only ~230–300 px wide (the supplied artwork's resolution).
+
 ## Decisions made on the second brief (tell the owner; reversible)
 
 - **Retired pages**: Health, Career, Money and Reflect are gone (redirect to `/life`); their data is kept. Water and sleep became quest ideas, and career logs and savings became "Log an activity" types. The brief's Life Balance has to be driven by quests, and these trackers awarded Aura outside that.
@@ -32,7 +36,7 @@ A private life-gamification web app for five cousins (Hyderabad and Bangalore, i
 - **Life Vision** items were refiled under Character (Life Vision is calculated now).
 - **Visibility**: quests default to shared, except Emotional and Financial (private). Migrated one-time quests are private, as they were before.
 - **Characters** are unique per cousin. Badge frames are cosmetic only. Rivalry winners get a trophy and badge, not Aura.
-- **Dark is the default theme**; light and automatic remain options.
+- ~~Dark is the default theme~~: reversed by the third brief; light is the default, dark and automatic remain options.
 
 ## What was built (second brief)
 
@@ -55,7 +59,7 @@ A private life-gamification web app for five cousins (Hyderabad and Bangalore, i
 | Static content | `lib/catalog.ts` (dims, characters, frames, ranks, effort, ideas, activities) |
 | Types | `lib/types.ts` (`GameState`, `Member`, `Me`, `View` with `stats`, `NotifyPrefs`, `OutboxItem`) |
 | Client state | `lib/store.tsx` (`GameProvider`, `useGame` with `stats(id)` and `surge`, `newId`) |
-| Storage / migrations | `lib/server/db.ts` (adds `outbox`), `lib/server/migrations.ts` (`LATEST_SCHEMA = 5`) |
+| Storage / migrations | `lib/server/db.ts` (adds `outbox`), `lib/server/migrations.ts` (`LATEST_SCHEMA = 6`) |
 | Per-user filtering | `lib/server/view.ts` (`viewFor`, cached `squadStats`) |
 | Tests | `tests/*.test.ts` via `npm test` (compiled to `.test-build/`, git-ignored) |
 

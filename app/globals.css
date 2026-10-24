@@ -3,39 +3,48 @@
 @tailwind utilities;
 
 /*
- * Thunderstorms 'n' All: a cinematic storm, refined like Apple hardware.
- * Deep midnight navy and graphite surfaces; electric blue for action,
- * lightning violet and cool cyan for energy, warm amber reserved for
- * achievements. Dark is the default; light mode keeps the same structure.
+ * Thunderstorms 'n' All: an Apple-refined productivity dashboard inside a
+ * premium fantasy storm. Light is the default: white and off-white
+ * surfaces, light blue and lavender air, electric blue for action, violet,
+ * teal and gold for highlights (gold for achievements). Dark mode keeps the
+ * same structure on midnight navy.
  */
 @layer base {
   :root {
-    --background: 222 30% 97%;
-    --foreground: 226 45% 9%;
+    /* light: white and soft off-white, light blue and lavender air, electric blue for action */
+    --background: 226 45% 97.6%;
+    --foreground: 228 42% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 226 45% 9%;
+    --card-foreground: 228 42% 12%;
     --popover: 0 0% 100%;
-    --primary: 218 92% 52%;
+    --primary: 220 90% 54%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 222 24% 93%;
-    --secondary-foreground: 226 45% 9%;
-    --muted: 222 24% 93%;
-    --muted-foreground: 222 13% 40%;
-    --accent: 36 92% 48%;
-    --accent-foreground: 226 45% 9%;
-    --arc: 262 72% 58%;
-    --ion: 191 88% 38%;
+    --secondary: 226 38% 94.5%;
+    --secondary-foreground: 228 42% 12%;
+    --muted: 226 38% 94.5%;
+    --muted-foreground: 226 14% 42%;
+    --accent: 38 90% 46%;
+    --accent-foreground: 228 42% 12%;
+    --arc: 262 70% 60%;
+    --ion: 186 80% 38%;
     --success: 152 58% 36%;
     --destructive: 0 72% 50%;
     --destructive-foreground: 0 0% 100%;
-    --border: 222 20% 88%;
-    --input: 222 20% 85%;
-    --ring: 218 92% 52%;
+    --border: 226 32% 90%;
+    --input: 226 28% 86%;
+    --ring: 220 90% 54%;
     --radius: 1.25rem;
-    --shadow-card: 0 1px 2px rgb(16 24 40 / 0.05), 0 10px 28px -16px rgb(16 24 40 / 0.18);
-    --shadow-float: 0 22px 60px -20px rgb(16 24 40 / 0.35);
-    --sky-1: 220 60% 88%;
-    --sky-2: 262 50% 92%;
+    --shadow-card: 0 1px 2px rgb(30 45 90 / 0.04), 0 12px 32px -18px rgb(40 60 120 / 0.22);
+    --shadow-float: 0 24px 60px -22px rgb(40 60 120 / 0.32);
+    --sky-1: 214 92% 84%;
+    --sky-2: 262 85% 89%;
+    /* the storm scenery behind headers */
+    --scene-top: 214 90% 91%;
+    --scene-mid: 258 80% 94%;
+    --scene-glow: 40 100% 92%;
+    --scene-ridge: 226 42% 80%;
+    --scene-far: 222 50% 87%;
+    --scene-cloud: 0 0% 100%;
   }
   .dark {
     --background: 229 52% 4%;
@@ -62,6 +71,12 @@
     --shadow-float: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 28px 70px -24px rgb(0 0 0 / 0.95);
     --sky-1: 222 80% 30%;
     --sky-2: 266 60% 26%;
+    --scene-top: 224 62% 16%;
+    --scene-mid: 262 46% 18%;
+    --scene-glow: 216 90% 40%;
+    --scene-ridge: 230 48% 8%;
+    --scene-far: 228 42% 13%;
+    --scene-cloud: 226 40% 26%;
   }
 
   * { @apply border-border; }

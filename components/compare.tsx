@@ -118,7 +118,7 @@ function WideCell({ c, dim, lead, up }: { c: Cell; dim: DimId; lead: boolean; up
         {up && <TrendingUp className="h-3.5 w-3.5 text-success" aria-label="Most improved" />}
         <Delta now={c.v} prev={c.prev} className="ml-auto" />
       </div>
-      <ScoreBar value={c.v} prev={c.prev} color={color} height={7} />
+      <ScoreBar value={c.v} prev={c.prev} color={color} height={5} />
     </div>
   );
 }
@@ -129,7 +129,7 @@ function TallCell({ c, dim, me, lead, up }: { c: Cell; dim: DimId; me: string; l
   return (
     <div className="flex flex-col items-center gap-1.5">
       <span className={cn("font-display text-[14px] font-semibold tabular-nums", c.v === null && "text-[12px] font-normal text-muted-foreground")}>{pct(c.v)}</span>
-      <div className="relative h-24 w-7 overflow-hidden rounded-full bg-secondary" role="img" aria-label={`${c.m.name}: ${c.v === null ? "not enough data" : `${c.v}%`}`}>
+      <div className="relative h-24 w-5 overflow-hidden rounded-full bg-secondary" role="img" aria-label={`${c.m.name}: ${c.v === null ? "not enough data" : `${c.v}%`}`}>
         {c.v !== null && <div className="absolute inset-x-0 bottom-0 rounded-full transition-[height] duration-700" style={{ height: `${v}%`, background: `linear-gradient(0deg, ${color}88, ${color})`, boxShadow: v ? `0 0 12px ${color}66` : undefined }} />}
         {c.prev !== null && <span className="absolute inset-x-0 h-[2px] bg-foreground/60" style={{ bottom: `calc(${c.prev}% - 1px)` }} />}
       </div>

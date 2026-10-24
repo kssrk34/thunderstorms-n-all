@@ -4,7 +4,8 @@ import { applyAction, type Action } from "../lib/reducer";
 import { toStored } from "../lib/seed";
 import type { DB, UserRecord } from "../lib/server/db";
 import { migrate } from "../lib/server/migrations";
-import { enqueue } from "../lib/server/notify";
+import { defaultKinds, enqueue } from "../lib/server/notify";
+import type { NotifyPrefs } from "../lib/types";
 import { fullGame, viewFor } from "../lib/server/view";
 import { today } from "../lib/utils";
 import { A, B, ago, squad } from "./helpers";
@@ -13,7 +14,7 @@ function user(id: string, name: string, extra: Partial<UserRecord> = {}): UserRe
   return { id, username: name.toLowerCase(), name, passHash: "x", role: id === A ? "admin" : "member", emoji: "⚡", color: "#4C8DFF", onboarded: true, createdAt: Date.now() - 30 * 86_400_000, ...extra };
 }
 function db(): DB {
-  return { schema: 5, rev: 1, meta: { createdAt: 0 }, users: [user(A, "Asha"), user(B, "Bala")], sessions: [], invites: [], resets: [], outbox: [], game: toStored({ ...squad(), members: [] }) };
+  return { schema: 6, rev: 1, meta: { createdAt: 0 }, users: [user(A, "Asha"), user(B, "Bala")], sessions: [], invites: [], resets: [], outbox: [], game: toStored({ ...squad(), members: [] }) };
 }
 function act(d: DB, me: string, ...actions: Action[]) {
   let g = fullGame(d);
@@ -66,7 +67,7 @@ test("migration 4 maps twelve areas onto ten dimensions and keeps every real ite
 
 test("other cousins see aggregates, never private details", () => {
   const d = db();
-  d.users[0].notify = { phone: "+919876543210", phoneVerified: true, whatsapp: true, push: false, kinds: { daily: true, overtaken: true, challengeDone: true, ending: true, recap: true }, quietStart: 22, quietEnd: 8, dailyLimit: 3, reminderHour: 9 };
+  d.users[0].notify = { phone: "+919876543210", phoneVerified: true, whatsapp: true, push: false, kinds: defaultKinds(), quietStart: 22, quietEnd: 8, dailyLimit: 3, reminderHour: 9 };
   act(d, A,
     { t: "habitAdd", id: "habit0001", habit: { title: "Evening walk", dim: "health", xp: 20 } },
     { t: "habitAdd", id: "habit0002", habit: { title: "Therapy homework", dim: "emotional", xp: 20 } },
@@ -106,10 +107,10 @@ test("personal notifications only reach their recipient", () => {
 
 test("notifications respect opt-in, dedupe, the daily limit and quiet hours, and never fake delivery", () => {
   const d = db();
-  const msg = (k: string) => ({ kind: "daily" as const, dedupe: k, body: "Your daily quests are waiting." });
+  const msg = (k: string) => ({ kind: "habits" as const, dedupe: k, body: "Your daily quests are waiting.", template: { name: "tna_daily_quests", params: ["Asha", "2", "40"] } });
   assert.equal(enqueue(d, A, msg("a")).length, 0, "nothing goes out without opting in");
 
-  d.users[0].notify = { phone: "+919876543210", phoneVerified: false, whatsapp: true, push: false, kinds: { daily: true, overtaken: true, challengeDone: true, ending: true, recap: true }, quietStart: 22, quietEnd: 8, dailyLimit: 2, reminderHour: 9 };
+  d.users[0].notify = { phone: "+919876543210", phoneVerified: false, whatsapp: true, push: false, kinds: defaultKinds(), quietStart: 22, quietEnd: 8, dailyLimit: 2, reminderHour: 9 };
   const noonIST = Date.parse(`${today()}T12:00:00+05:30`);
   const [first] = enqueue(d, A, msg("a"), noonIST);
   assert.equal(first.status, "simulated", "without WhatsApp credentials it's a labelled preview");
@@ -119,9 +120,9 @@ test("notifications respect opt-in, dedupe, the daily limit and quiet hours, and
   assert.equal(third.status, "skipped");
   assert.match(third.error!, /Daily limit/);
 
-  d.users[0].notify!.kinds.daily = false;
+  d.users[0].notify!.kinds.habits = false;
   assert.equal(enqueue(d, A, msg("d"), noonIST).length, 0, "kinds can be switched off");
-  d.users[0].notify!.kinds.daily = true;
+  d.users[0].notify!.kinds.habits = true;
 
   const lateIST = Date.parse(`${today()}T23:30:00+05:30`);
   d.outbox = [];
@@ -133,7 +134,7 @@ test("notifications respect opt-in, dedupe, the daily limit and quiet hours, and
 test("migration 5 clears everyone's activity and keeps every account intact", () => {
   const d = db();
   d.schema = 4;
-  Object.assign(d.users[0], { character: "volt", frame: "charged", bio: "Hi", photo: "data:image/jpeg;base64,AAAA", dailyGoal: 100 as const, notify: { phone: "+919876543210", whatsapp: true, push: false, kinds: { daily: true, overtaken: true, challengeDone: true, ending: true, recap: true }, quietStart: 22, quietEnd: 8, dailyLimit: 3, reminderHour: 9 } });
+  Object.assign(d.users[0], { character: "volt", frame: "charged", bio: "Hi", photo: "data:image/jpeg;base64,AAAA", dailyGoal: 100 as const, notify: { phone: "+919876543210", whatsapp: true, push: false, kinds: { daily: true, overtaken: true, challengeDone: true, ending: true, recap: true } as unknown as NotifyPrefs["kinds"], quietStart: 22, quietEnd: 8, dailyLimit: 3, reminderHour: 9 } });
   act(d, A,
     { t: "habitAdd", id: "habit0001", habit: { title: "Run", dim: "health", xp: 20 } },
     { t: "goalAdd", id: "goal00001", g: { title: "Fit", dim: "health" } },
@@ -143,7 +144,7 @@ test("migration 5 clears everyone's activity and keeps every account intact", ()
   d.outbox.push({ id: "o", userId: A, kind: "daily", channel: "push", dedupe: "x", createdAt: 1, notBefore: 1, updatedAt: 1, status: "sent", attempts: 1, body: "b" });
   const users = structuredClone(d.users.map(({ frame: _f, ...u }) => u));
   const rev = d.rev;
-  const out = migrate(d);
+  const out = migrate(d, 5);
   assert.equal(out.schema, 5);
   assert.equal(out.rev, rev + 1);
   for (const k of ["logs", "habits", "todos", "goals", "challenges", "rivalries", "meetups", "memories", "feed", "notifs"] as const) assert.deepEqual(out.game[k], [], k);

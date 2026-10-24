@@ -51,7 +51,7 @@ export default function Onboarding() {
 
   if (step === "avatar") {
     return (
-      <AuthFrame wide top={back} step={{ at: 2, of: 5 }} title="Choose your character" subtitle="Pick a storm agent, or upload a photo and crop it. Each character belongs to one cousin.">
+      <AuthFrame wide top={back} step={{ at: 2, of: 5 }} title="Choose your character" subtitle="Pick one of the five characters, or upload a photo and crop it. Each character belongs to one cousin.">
         <AvatarPicker compact />
         <div className="mt-6 border-t border-border/70 pt-4">
           <Button size="lg" variant={profile.character || profile.photo ? "default" : "ghost"} className="w-full" onClick={() => setStep("goals")}>
